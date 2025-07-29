@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
+</head>
+<body class="bg-gray-100 antialiased text-gray-900">
+  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
+      <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+        <div class="flex items-center space-x-2">
+          <img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
+          <span class="text-xl font-semibold sidebar-text">US Squash</span>
+        </div>
+        <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      </div>
+      <nav class="flex-1 overflow-y-auto mt-4 px-2 text-sm font-medium space-y-6">
+        <div>
+          <p class="text-gray-500 uppercase sidebar-text">Profile</p>
+          <ul class="mt-2 space-y-1">
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-purple-600"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="sidebar-text">Dashboard</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="bar-chart" class="w-5 h-5"></i><span class="sidebar-text">Analytics</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="user-round-search" class="w-5 h-5"></i><span class="sidebar-text">Player Tracker</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="swords" class="w-5 h-5"></i><span class="sidebar-text">Head to Head</span></a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-gray-500 uppercase sidebar-text">Players</p>
+          <ul class="mt-2 space-y-1">
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar" class="w-5 h-5"></i><span class="sidebar-text">Events</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Rankings</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="columns-3" class="w-5 h-5"></i><span class="sidebar-text">Leagues</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="house" class="w-5 h-5"></i><span class="sidebar-text">Clubs</span></a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-gray-500 uppercase sidebar-text">College Squash Association</p>
+          <ul class="mt-2 space-y-1">
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="university" class="w-5 h-5"></i><span class="sidebar-text">Home</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings</span></a></li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-gray-500 uppercase sidebar-text">Other</p>
+          <ul class="mt-2 space-y-1">
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="life-buoy" class="w-5 h-5"></i><span class="sidebar-text">Help</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Settings</span></a></li>
+          </ul>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-6">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">Welcome Back, Gabe 🎉</h1>
+          <p class="text-sm text-gray-500">Your dashboard has been updated with the latest updates.</p>
+        </div>
+        <div class="relative">
+          <input
+            type="text"
+            placeholder="Search..."
+            class="pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm"
+          />
+          <svg
+            class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- Ratings + Personal Info + Match Breakdown -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <!-- Ratings Card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <p class="text-xs text-neutral-500 tracking-wide uppercase">Current Rating</p>
+              <h2 id="current-rating" class="text-5xl font-extrabold text-indigo-600 tracking-tight leading-tight">4.99</h2>
+            </div>
+            <div class="text-right">
+              <span class="inline-block bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-1 rounded-full">Active</span>
+            </div>
+          </div>
+
+          <div class="space-y-5 text-[15px] text-neutral-700 leading-relaxed">
+            <!-- Progress Bar -->
+            <div>
+              <p class="text-sm text-neutral-500 mb-1">Progress to Next Level</p>
+              <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full"
+                  style="width: 49%"
+                ></div>
+              </div>
+              <p class="text-xs mt-2 text-neutral-400 italic">49% towards semi-pro</p>
+            </div>
+
+            <!-- Stats Overview -->
+            <div class="grid grid-cols-2 gap-5">
+              <div>
+                <p class="text-sm font-medium text-neutral-800">Highest Rating</p>
+                <p class="text-sm text-neutral-600">
+                  <span id="highest-rating">5.01</span> 
+                  <span class="text-gray-400" id="highest-rating-date">(May 31, 2025)</span>
+                </p>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-neutral-800">Matches Played</p>
+                <p class="text-sm text-neutral-600">142</p>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-neutral-800">Win Rate</p>
+                <p class="text-sm text-neutral-600">68%</p>
+              </div>
+              <div>
+                <p class="text-sm font-medium text-neutral-800">Avg Opponent Rating</p>
+                <p class="text-sm text-neutral-600">4.85</p>
+              </div>
+            </div>
+
+            <!-- Badge & Tier -->
+            <div class="mt-4 flex items-center justify-between text-sm">
+              <div class="flex items-center gap-2">
+                <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M10 15l-5.878 3.09 1.122-6.545L.488 6.91l6.564-.955L10 0l2.948 5.955 6.564.955-4.756 4.635 1.122 6.545z" />
+                </svg>
+                <span class="text-neutral-600">Tier: Advanced</span>
+              </div>
+              <div class="text-xs text-neutral-400">Updated: Jul 27, 2025</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Personal Details -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl col-span-2 font-sans">
+          <h2 class="text-xl font-semibold mb-4 text-gray-800">Personal Details</h2>
+          <div class="flex items-center mb-4">
+            <img src="https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png" alt="Profile Picture" class="w-16 h-16 rounded-full object-cover mr-4 shadow" />
+            <div>
+              <p class="text-lg font-bold text-gray-900">Gabe Solonsky</p>
+              <p class="text-sm text-gray-500">Member, US Squash</p>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 text-sm text-gray-700">
+            <p><strong class="text-gray-900 font-medium">Email:</strong> solonskyg@gmail.com</p>
+            <p><strong class="text-gray-900 font-medium">Phone:</strong> 301-347-8710</p>
+            <p><strong class="text-gray-900 font-medium">Birthday:</strong> July 13, 2006</p>
+            <p><strong class="text-gray-900 font-medium">Gender:</strong> Male</p>
+            <p><strong class="text-gray-900 font-medium">Citizenship:</strong> United States</p>
+            <p><strong class="text-gray-900 font-medium">City:</strong> Bethesda, MD 20816</p>
+            <p><strong class="text-gray-900 font-medium">Affiliation:</strong> Connecticut College</p>
+            <p><strong class="text-gray-900 font-medium">Membership Valid Through:</strong> July 1, 2026</p>
+          </div>
+        </div>
+
+        <!-- Match Breakdown -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl col-span-1 font-sans">
+          <h2 class="text-lg font-semibold text-gray-800 mb-4">Match Breakdown</h2>
+          <div class="grid grid-cols-1 gap-3 text-sm text-gray-700">
+            <div class="flex justify-between">
+              <span>3-Game Wins</span>
+              <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">25</span>
+            </div>
+            <div class="flex justify-between">
+              <span>4-Game Wins</span>
+              <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">25</span>
+            </div>
+            <div class="flex justify-between">
+              <span>5-Game Wins</span>
+              <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">15</span>
+            </div>
+            <div class="flex justify-between">
+              <span>3-Game Losses</span>
+              <span class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">30</span>
+            </div>
+            <div class="flex justify-between">
+              <span>4-Game Losses</span>
+              <span class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">10</span>
+            </div>
+            <div class="flex justify-between">
+              <span>5-Game Losses</span>
+              <span class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">13</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rating Chart & Matches -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Rating Chart -->
+        <div class="col-span-2 bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+          <h2 class="text-lg font-semibold mb-4 text-gray-800">Rating Over Time</h2>
+          <div id="chart"></div>
+        </div>
+
+        <!-- Matches -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+          <h2 class="text-lg font-semibold mb-4">Upcoming Matches</h2>
+          <div class="space-y-3 mb-6">
+            <div class="event-card">
+              <img src="https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png" class="event-logo" alt="Match">
+              <div class="event-details">
+                <p><strong>Jul 12, 2025</strong></p>
+                <p>National Series — vs. Ethan Brooks</p>
+                <p>Scheduled for 2:00 PM</p>
+              </div>
+            </div>
+          </div>
+            <h2 class="text-lg font-semibold mb-2">Completed Matches</h2>
+              <div id="matches-container" class="space-y-3 overflow-y-auto max-h-[16.5rem] pr-2 no-scrollbar"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
+
+
+
+
+
