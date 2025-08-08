@@ -32,7 +32,7 @@
 <body class="bg-gray-100 antialiased text-gray-900">
   <!-- Password Modal -->
   <div id="password-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" style="display: none;">
-      <div class="bg-white p-8 rounded-lg shadow-xl text-center w-full max-w-sm">
+      <div class="bg-white p-8 rounded-lg shadow-xl text-center w-full max-w-sm mx-4">
           <h2 class="text-2xl font-bold mb-4">Access Required</h2>
           <p class="text-gray-600 mb-6">Please enter the password to view analytics.</p>
           <input type="password" id="password-input" class="border border-gray-300 rounded-md p-2 text-center text-lg w-full focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter password">
@@ -43,7 +43,7 @@
   </div>
 
   <div class="flex h-screen overflow-hidden sidebar-expanded" id="app">
-    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
+    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300 md:translate-x-0 -translate-x-full">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
         <div class="flex items-center space-x-2">
           <img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
@@ -103,18 +103,18 @@
       </nav>
     </aside>
 
-    <main class="flex-1 overflow-y-auto p-6">
-      <div class="flex justify-between items-center mb-6">
+    <main class="flex-1 overflow-y-auto p-4 md:p-6">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 id="welcome-message" class="text-2xl font-semibold tracking-tight">Welcome Back... 🎉</h1>
           <p class="text-sm text-gray-500">Your analytics have been updated with the latest updates.</p>
         </div>
-        <div class="relative">
+        <div class="relative w-full md:w-64">
           <input
             type="text"
             id="search-input"
             placeholder="Search for another player..."
-            class="pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm w-64"
+            class="pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm w-full"
           />
           <svg
             class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
@@ -129,9 +129,9 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <!-- Current Rating Card -->
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans flex flex-col">
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans flex flex-col lg:col-span-1">
           <div class="mb-4">
             <div class="flex items-center justify-between">
               <p class="text-lg font-semibold text-gray-800">Current Rating</p>
@@ -197,7 +197,7 @@
         </div>
 
         <!-- Weekly Rankings Card -->
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
           <h2 class="text-xl font-semibold mb-4 text-gray-800">Current Weekly Rankings</h2>
           <div id="weekly-rankings-list" class="space-y-2">
             <!-- Rankings will be dynamically inserted here -->
@@ -206,7 +206,7 @@
         </div>
         
         <!-- Match Breakdown Card -->
-          <div class="bg-white rounded-xl shadow-lg p-6">
+          <div class="bg-white rounded-xl shadow-lg p-6 lg:col-span-1">
             <h3 class="text-xl font-bold mb-4">Match Statistics</h3>
             <div class="space-y-2">
               <div class="flex justify-between">
@@ -257,7 +257,7 @@
           </div>
           
         <!-- Monthly Rating Change Card -->
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
           <h2 class="text-xl font-semibold mb-4 text-gray-800">Monthly Rating Change</h2>
           <div id="monthly-rating-change-list" class="space-y-2">
             <!-- Monthly changes will be dynamically inserted here -->
@@ -266,7 +266,7 @@
         </div>
 
         <!-- Top Opponents Card -->
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
           <h2 class="text-xl font-semibold mb-4 text-gray-800">Top Opponents by Rating</h2>
           <div id="top-opponents-list" class="space-y-3">
             <p class="text-center text-gray-500 mt-10">Loading data...</p>
@@ -274,7 +274,7 @@
         </div>
 
         <!-- Last Match Details Card -->
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
           <h2 class="text-xl font-semibold mb-4 text-gray-800">Last Match Details</h2>
           <div id="last-match-details" class="space-y-2">
              <p class="text-center text-gray-500 mt-10">Loading data...</p>
