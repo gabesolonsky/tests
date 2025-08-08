@@ -29,6 +29,29 @@ def proxy_user_rankings(user_id):
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         return jsonify({"error": "An unexpected error occurred."}), 500
+    
+@app.route("/proxy/player_tracker/list")
+def proxy_player_tracker_list_static():
+    # Hardcode the user ID as requested
+    user_id = 170053
+    
+    # Build the URL for the external API
+    api_url = f"https://api.ussquash.com/resources/res/player_tracker/list?userId={user_id}"
+    
+    logging.info(f"Fetching player tracker information from: {api_url}")
+    try:
+        response = requests.get(api_url, cookies=COOKIES, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logging.error(f"HTTP error: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request error: {e}")
+        return jsonify({"error": "Error fetching API data."}), 500
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
 
 @app.route("/proxy/user/<int:user_id>/matches/page/<int:page>")
 def proxy_user_matches(user_id, page):
@@ -216,6 +239,10 @@ def proxy_delete_player(player_id):
 @app.route("/trackertool")
 def trackertool():
     return render_template("trackertool.html")
+
+@app.route("/playertracker")
+def playertracker():
+    return render_template("playertracker.html")
 
 @app.route("/dashboard")
 def dashboard():
