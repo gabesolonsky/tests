@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Player Tracker Tool</title>
+</head>
+<body>
+    <h1>Player Tracker Tool</h1>
+
+    <label for="player_id">Player ID:</label>
+    <input type="number" id="player_id" name="player_id" required>
+
+    <br><br>
+
+    <button type="button" onclick="submitForm('add')">Add to Tracker</button>
+    <button type="button" onclick="submitForm('delete')">Remove from Tracker</button>
+
+    <p id="result"></p>
+
+    <script>
+        function submitForm(action) {
+            const playerId = document.getElementById("player_id").value;
+            const result = document.getElementById("result");
+
+            if (!playerId) {
+                result.textContent = "Please enter a valid Player ID.";
+                return;
+            }
+
+            if (action === 'add') {
+                fetch("/proxy/player_tracker/add", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ playerId: parseInt(playerId) })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        result.textContent = `Success: Player ${playerId} added.`;
+                    } else {
+                        result.textContent = `Error: ${data.error || "Unknown error"}`;
+                    }
+                })
+                .catch(err => {
+                    result.textContent = `Request failed: ${err}`;
+                });
+
+            } else if (action === 'delete') {
+                fetch(`/proxy/player_tracker/${playerId}`, {
+                    method: "DELETE"
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        result.textContent = `Success: Player ${playerId} removed.`;
+                    } else {
+                        result.textContent = `Error: ${data.error || "Unknown error"}`;
+                    }
+                })
+                .catch(err => {
+                    result.textContent = `Request failed: ${err}`;
+                });
+            }
+        }
+    </script>
+</body>
+</html>

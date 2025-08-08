@@ -3,14 +3,45 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>User Dashboard</title>
+  <title>User Analytics</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
+  <style>
+    .event-card {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        background-color: #f9fafb;
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        transition: all 0.2s ease-in-out;
+        cursor: pointer;
+    }
+    .event-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    .event-card.win { border-left: 4px solid #10b981; }
+    .event-card.lose { border-left: 4px solid #ef4444; }
+    .event-logo { width: 40px; height: 40px; border-radius: 9999px; object-fit: cover; margin-right: 0.75rem; }
+    .event-details p { margin: 0; line-height: 1.4; }
+  </style>
 </head>
 <body class="bg-gray-100 antialiased text-gray-900">
+  <!-- Password Modal -->
+  <div id="password-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" style="display: none;">
+      <div class="bg-white p-8 rounded-lg shadow-xl text-center w-full max-w-sm">
+          <h2 class="text-2xl font-bold mb-4">Access Required</h2>
+          <p class="text-gray-600 mb-6">Please enter the password to view analytics.</p>
+          <input type="password" id="password-input" class="border border-gray-300 rounded-md p-2 text-center text-lg w-full focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter password">
+          <button id="password-submit-btn" class="mt-4 w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Enter</button>
+          <p id="password-error-message" class="text-red-500 text-sm mt-2 hidden">Incorrect password. Please try again.</p>
+          <p class="text-gray-500 text-sm mt-4">Contact Us: <a href="tel:301-347-8710" class="text-indigo-500 hover:underline">301-347-8710</a></p>
+      </div>
+  </div>
+
   <div class="flex h-screen overflow-hidden sidebar-expanded" id="app">
     <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
@@ -20,7 +51,6 @@
         </div>
         <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevrons-left"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
           </svg>
         </button>
       </div>
@@ -28,9 +58,8 @@
         <div>
           <p class="text-gray-500 uppercase sidebar-text">Profile</p>
           <ul class="mt-2 space-y-1">
-            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-purple-600"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="sidebar-text">Dashboard</span></a></li>
-            <!-- Updated Analytics link to pass userId -->
-            <li><a href="analytics" id="analytics-link" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="bar-chart" class="w-5 h-5"></i><span class="sidebar-text">Analytics</span></a></li>
+            <li><a href="dashboard" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="sidebar-text">Dashboard</span></a></li>
+            <li><a href="#" id="analytics-link" class="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-100 text-purple-600"><i data-lucide="bar-chart" class="w-5 h-5"></i><span class="sidebar-text">Analytics</span></a></li>
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="user-round-search" class="w-5 h-5"></i><span class="sidebar-text">Player Tracker</span></a></li>
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="swords" class="w-5 h-5"></i><span class="sidebar-text">Head to Head</span></a></li>
           </ul>
@@ -63,11 +92,10 @@
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Settings</span></a></li>
           </ul>
         </div>
-                <!-- Contact Me section added here -->
         <div>
           <p class="text-gray-500 uppercase sidebar-text mt-6">Contact</p>
           <ul class="mt-2 space-y-1">
-              <li><a href="tel:${CONTACT_PHONE_NUMBER}" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+              <li><a href="tel:301-347-8710" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
                   <i data-lucide="phone" class="w-5 h-5"></i><span class="sidebar-text">Call Us: 301-347-8710</span>
               </a></li>
           </ul>
@@ -78,15 +106,15 @@
     <main class="flex-1 overflow-y-auto p-6">
       <div class="flex justify-between items-center mb-6">
         <div>
-          <h1 id="welcome-message" class="text-2xl font-semibold tracking-tight">Welcome Back, Gabe 🎉</h1>
-          <p class="text-sm text-gray-500">Your dashboard has been updated with the latest updates.</p>
+          <h1 id="welcome-message" class="text-2xl font-semibold tracking-tight">Welcome Back... 🎉</h1>
+          <p class="text-sm text-gray-500">Your analytics have been updated with the latest updates.</p>
         </div>
         <div class="relative">
           <input
             type="text"
             id="search-input"
-            placeholder="Search..."
-            class="pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm"
+            placeholder="Search for another player..."
+            class="pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm w-64"
           />
           <svg
             class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
@@ -101,8 +129,9 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans flex flex-col justify-between">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <!-- Current Rating Card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans flex flex-col">
           <div class="mb-4">
             <div class="flex items-center justify-between">
               <p class="text-lg font-semibold text-gray-800">Current Rating</p>
@@ -113,7 +142,7 @@
             <h2 id="current-rating" class="text-5xl font-extrabold text-indigo-600 tracking-tight leading-tight mt-2">4.99</h2>
           </div>
 
-          <div class="space-y-5 text-[15px] text-neutral-700 leading-relaxed">
+          <div class="space-y-4 text-[15px] text-neutral-700 leading-relaxed mt-4">
             <div>
               <div class="flex items-center gap-1 mb-1 relative group">
                 <p class="text-sm text-neutral-500">Progress to Next Level</p>
@@ -132,7 +161,7 @@
               <p class="text-xs mt-2 text-neutral-400 italic">49% towards semi-pro</p>
             </div>
 
-            <div class="grid grid-cols-2 gap-5">
+            <div class="grid grid-cols-2 gap-y-4 gap-x-5">
               <div>
                 <p class="text-sm font-medium text-neutral-800">Highest Rating</p>
                 <p class="text-sm text-neutral-600">
@@ -149,12 +178,13 @@
                 <p class="text-sm text-neutral-600"><span id="win-rate-display">0%</span></p>
               </div>
               <div>
-                <p class="text-sm font-medium text-neutral-800">Avg Opponent Rating</p>
-                <p id="average-opponent-rating" class="text-sm text-neutral-600">4.85</p>
+                  <p class="text-sm font-medium text-neutral-800">Avg Opponent Rating</p>
+                   <p id="average-opponent-rating" class="text-lg font-semibold text-neutral-700">N/A</p>
+                   <p id="opponent-rating-status" class="text-xs text-gray-500 h-4"></p>
               </div>
             </div>
 
-            <div class="mt-4 flex items-center justify-between text-sm">
+            <div class="mt-auto pt-4 flex items-center justify-between text-sm">
               <div class="flex items-center gap-2">
                 <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 15l-5.878 3.09 1.122-6.545L.488 6.91l6.564-.955L10 0l2.948 5.955 6.564.955-4.756 4.635 1.122 6.545z" />
@@ -166,109 +196,108 @@
           </div>
         </div>
 
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl col-span-2 font-sans">
-          <h2 class="text-xl font-semibold mb-4 text-gray-800">Personal Details</h2>
-          <div class="flex items-center mb-4">
-            <img id="profile-picture" src="https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png" alt="Profile Picture" class="w-16 h-16 rounded-full object-cover mr-4 shadow" />
-            <div>
-              <p id="player-name" class="text-lg font-bold text-gray-900">Gabe Solonsky</p>
-              <p id="member-status" class="text-sm text-gray-500">Member, US Squash</p>
-            </div>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-3 text-sm text-gray-700">
-            <p><strong class="text-gray-900 font-medium">Email:</strong> <span id="player-email">solonskyg@gmail.com</span></p>
-            <p><strong class="text-gray-900 font-medium">Phone:</strong> <span id="player-phone">301-347-8710</span></p>
-            <p><strong class="text-gray-900 font-medium">Birthday:</strong> <span id="player-birthday">July 13, 2006</span></p>
-            <p><strong class="text-gray-900 font-medium">Gender:</strong> <span id="player-gender">Male</span></p>
-            <p><strong class="text-gray-900 font-medium">Citizenship:</strong> <span id="player-citizenship">United States</span></p>
-            <p><strong class="text-gray-900 font-medium">City:</strong> <span id="player-city">Bethesda, MD 20816</span></p>
-            <p><strong class="text-gray-900 font-medium">Affiliation:</strong> <span id="player-affiliation">Connecticut College</span></p>
-            <p><strong class="text-gray-900 font-medium">Membership Valid Through:</strong> <span id="player-membership-thru">July 1, 2026</span></p>
+        <!-- Weekly Rankings Card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+          <h2 class="text-xl font-semibold mb-4 text-gray-800">Current Weekly Rankings</h2>
+          <div id="weekly-rankings-list" class="space-y-2">
+            <!-- Rankings will be dynamically inserted here -->
+            <p class="text-center text-gray-500 mt-10">Loading rankings...</p>
           </div>
         </div>
-
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-4 shadow-xl col-span-1 font-sans">
-          <h2 class="text-lg font-semibold text-gray-800 mb-4">Match Breakdown</h2>
-          <div class="grid grid-cols-1 gap-3 text-sm text-gray-700">
-            <div class="flex justify-between">
-              <span>3-Game Wins</span>
-              <span id="wins-3-game" class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">0</span>
-            </div>
-            <div class="flex justify-between">
-              <span>4-Game Wins</span>
-              <span id="wins-4-game" class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">0</span>
-            </div>
-            <div class="flex justify-between">
-              <span>5-Game Wins</span>
-              <span id="wins-5-game" class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">0</span>
-            </div>
-            <div class="flex justify-between">
-              <span>3-Game Losses</span>
-              <span id="losses-3-game" class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">0</span>
-            </div>
-            <div class="flex justify-between">
-              <span>4-Game Losses</span>
-              <span id="losses-4-game" class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">0</span>
-            </div>
-            <div class="flex justify-between">
-              <span>5-Game Losses</span>
-              <span id="losses-5-game" class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">0</span>
-            </div>
-            <hr class="my-2 border-gray-300">
-            <div class="flex justify-between text-sm text-gray-600">
-              <span class="font-medium">Overall Wins</span>
-              <span id="overall-wins" class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">0</span>
-            </div>
-            <div class="flex justify-between text-sm text-gray-600">
-              <span class="font-medium">Overall Losses</span>
-              <span id="overall-losses" class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">0</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="col-span-2 bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans flex flex-col">
-          <h2 class="text-lg font-semibold mb-4 text-gray-800">Rating Over Time</h2>
-          <div id="chart" class="flex-1"></div>
-        </div>
-
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans flex flex-col">
-            <h2 class="text-lg font-semibold mb-2">Completed Matches</h2>
-              <div id="matches-container" class="space-y-3 overflow-y-auto pr-2 no-scrollbar max-h-96"></div>
-              <div id="loading-matches-indicator" class="text-center py-2" style="display:none;">
-                  <svg class="animate-spin h-5 w-5 text-gray-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <p class="text-sm text-gray-500 mt-1">Loading more matches...</p>
+        
+        <!-- Match Breakdown Card -->
+          <div class="bg-white rounded-xl shadow-lg p-6">
+            <h3 class="text-xl font-bold mb-4">Match Statistics</h3>
+            <div class="space-y-2">
+              <div class="flex justify-between">
+                <span>Wins</span>
+                <span id="wins" class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">0</span>
               </div>
-              <button id="load-more-matches-btn" class="mt-4 w-full bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white text-base font-semibold py-3 px-6 rounded-xl shadow-lg transition-all duration-300 ease-in-out">Load More Matches</button>
-              <p id="no-more-matches-message" class="text-center text-gray-500 mt-4" style="display:none;">No more matches to load.</p>
+              <div class="flex justify-between">
+                <span>Losses</span>
+                <span id="losses" class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span>Win Percentage</span>
+                <span id="win-percentage" class="px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">0%</span>
+              </div>
+            </div>
+            <hr class="my-4 border-gray-300" />
+            <div class="space-y-2">
+              <h4 class="font-semibold text-gray-700">Wins by Game Count</h4>
+              <div class="flex justify-between">
+                <span>3-Game Wins</span>
+                <span id="wins-3-game" class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span>4-Game Wins</span>
+                <span id="wins-4-game" class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span>5-Game Wins</span>
+                <span id="wins-5-game" class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">0</span>
+              </div>
+            </div>
+            <hr class="my-4 border-gray-300" />
+            <div class="space-y-2">
+              <h4 class="font-semibold text-gray-700">Losses by Game Count</h4>
+              <div class="flex justify-between">
+                <span>3-Game Losses</span>
+                <span id="losses-3-game" class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span>4-Game Losses</span>
+                <span id="losses-4-game" class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">0</span>
+              </div>
+              <div class="flex justify-between">
+                <span>5-Game Losses</span>
+                <span id="losses-5-game" class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">0</span>
+              </div>
+            </div>
+          </div>
+          
+        <!-- Monthly Rating Change Card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+          <h2 class="text-xl font-semibold mb-4 text-gray-800">Monthly Rating Change</h2>
+          <div id="monthly-rating-change-list" class="space-y-2">
+            <!-- Monthly changes will be dynamically inserted here -->
+            <p class="text-center text-gray-500 mt-10">Loading data...</p>
+          </div>
+        </div>
+
+        <!-- Top Opponents Card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+          <h2 class="text-xl font-semibold mb-4 text-gray-800">Top Opponents by Rating</h2>
+          <div id="top-opponents-list" class="space-y-3">
+            <p class="text-center text-gray-500 mt-10">Loading data...</p>
+          </div>
+        </div>
+
+        <!-- Last Match Details Card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
+          <h2 class="text-xl font-semibold mb-4 text-gray-800">Last Match Details</h2>
+          <div id="last-match-details" class="space-y-2">
+             <p class="text-center text-gray-500 mt-10">Loading data...</p>
           </div>
         </div>
       </div>
     </main>
   </div>
-
-<div id="graph-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
-        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
-            <h3 class="text-xl font-semibold text-gray-800">Match Insights</h3>
-            <button id="graph-close" class="text-gray-500 hover:text-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-            </button>
-        </div>
-
-        <div class="p-6">
-            <p id="graph-status" class="text-center text-gray-500 mb-4"></p>
-            <div id="metrics-container" class="min-h-[200px] flex flex-col">
-                <div class="text-center text-gray-400 py-10">Loading match data...</div>
+  
+  <!-- Match Insights Modal -->
+    <div id="graph-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h2 id="match-insights-title" class="text-xl font-bold">Match Insights</h2>
+                <button id="graph-close" class="text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <div id="graph-status" class="p-4 text-center"></div>
+            <div id="metrics-container" class="overflow-y-auto p-4">
+                <!-- Graph and metrics will be loaded here -->
             </div>
         </div>
     </div>
-</div>
 
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+<script src="{{ url_for('static', filename='analytics.js') }}"></script>
 </body>
 </html>
