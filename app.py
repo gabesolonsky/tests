@@ -107,6 +107,139 @@ def proxy_user_ratings_top(user_id):
         logger.error(f"Unexpected error for ratings-top: {e}")
         return jsonify({"error": "An unexpected error occurred."}), 500
 
+
+@app.route("/proxy/leagues/info/<int:league_id>")
+def proxy_league_info(league_id):
+    api_url = f"https://api.ussquash.com/resources/leagues/info/{league_id}"
+    logger.info(f"Fetching league info from: {api_url}")
+    try:
+        response = requests.get(api_url, cookies=COOKIES, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error for league info: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error for league info: {e}")
+        return jsonify({"error": "Error fetching league info data."}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error for league info: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@app.route("/proxy/divisions/<int:division_id>")
+def proxy_division_info(division_id):
+    api_url = f"https://api.ussquash.com/resources/divisions/{division_id}"
+    logger.info(f"Fetching division info from: {api_url}")
+    try:
+        response = requests.get(api_url, cookies=COOKIES, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error for division info: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error for division info: {e}")
+        return jsonify({"error": "Error fetching division info data."}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error for division info: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@app.route("/proxy/divisions/schedule/<int:division_id>")
+def proxy_division_schedule(division_id):
+    api_url = f"https://api.ussquash.com/resources/divisions/schedule/{division_id}"
+    logger.info(f"Fetching division schedule from: {api_url}")
+    try:
+        response = requests.get(api_url, cookies=COOKIES, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error for division schedule: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error for division schedule: {e}")
+        return jsonify({"error": "Error fetching division schedule data."}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error for division schedule: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@app.route("/proxy/divisions/playerStandings/<int:division_id>")
+def proxy_division_standings(division_id):
+    api_url = f"https://api.ussquash.com/resources/divisions/playerStandings/{division_id}"
+    logger.info(f"Fetching division standings from: {api_url}")
+    try:
+        response = requests.get(api_url, cookies=COOKIES, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error for division standings: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error for division standings: {e}")
+        return jsonify({"error": "Error fetching division standings data."}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error for division standings: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@app.route("/proxy/divisions/standings/<int:division_id>")
+def proxy_division_standings_v2(division_id):
+    api_url = f"https://api.ussquash.com/resources/divisions/standings/{division_id}"
+    logger.info(f"Fetching division standings (v2) from: {api_url}")
+    try:
+        response = requests.get(api_url, cookies=COOKIES, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error for division standings v2: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error for division standings v2: {e}")
+        return jsonify({"error": "Error fetching division standings data."}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error for division standings v2: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@app.route("/proxy/teams/<int:team_id>/players")
+def proxy_team_players(team_id):
+    api_url = f"https://api.ussquash.com/resources/teams/{team_id}/players"
+    logger.info(f"Fetching team players from: {api_url}")
+    try:
+        response = requests.get(api_url, cookies=COOKIES, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error for team players: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error for team players: {e}")
+        return jsonify({"error": "Error fetching team players data."}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error for team players: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@app.route("/proxy/teams/<int:team_id>/schedule")
+def proxy_team_schedule(team_id):
+    api_url = f"https://api.ussquash.com/resources/teams/{team_id}/schedule"
+    logger.info(f"Fetching team schedule from: {api_url}")
+    try:
+        response = requests.get(api_url, cookies=COOKIES, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error for team schedule: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error for team schedule: {e}")
+        return jsonify({"error": "Error fetching team schedule data."}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error for team schedule: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
 @app.route("/proxy/user/<int:user_id>/record")
 def proxy_user_record(user_id):
     api_url = f"https://api.ussquash.com/resources/res/user/{user_id}/record"

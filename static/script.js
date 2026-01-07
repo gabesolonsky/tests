@@ -382,33 +382,52 @@ async function fetchUserRatings(currentUserId) {
     const statusIndicatorEl = document.getElementById("status-indicator");
     const currentTierNameDisplayEl = document.getElementById('current-tier-name-display');
 
-    const ratingObj = data.find(r => r.ratingTypeName === "Singles International Rating");
+        // Try to find the singles rating entry and robustly extract a numeric value.
+        let ratingObj = data.find(r => /singles/i.test(r.ratingTypeName || '')) || data.find(r => r.ratingTypeName === "Singles International Rating");
+        const extractNumeric = (obj) => {
+            if (!obj) return NaN;
+            const candidates = [obj.rating, obj.Rating, obj.value, obj.ratingValue];
+            for (const c of candidates) {
+                const parsed = parseFloat(c);
+                if (!isNaN(parsed)) return parsed;
+            }
+            return NaN;
+        };
 
-    if (ratingObj && typeof ratingObj.rating === 'number' && !isNaN(ratingObj.rating)) {
-      currentRatingEl.textContent = `${ratingObj.rating.toFixed(2)}`;
-      updateProgressBar(ratingObj.rating);
+        let parsedRating = extractNumeric(ratingObj);
+        if (isNaN(parsedRating)) {
+            const singlesFallback = data.find(r => /singles/i.test(r.ratingTypeName || ''));
+            if (singlesFallback) parsedRating = extractNumeric(singlesFallback);
+        }
+        if (isNaN(parsedRating)) {
+            for (const entry of data) {
+                const v = extractNumeric(entry);
+                if (!isNaN(v)) { parsedRating = v; break; }
+            }
+        }
 
-      statusIndicatorEl.textContent = "Active";
-      statusIndicatorEl.className = "inline-block bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-1 rounded-full";
+        if (!isNaN(parsedRating)) {
+            currentRatingEl.textContent = `${parsedRating.toFixed(2)}`;
+            updateProgressBar(parsedRating);
 
-      if (currentTierNameDisplayEl) {
-          const currentRatingValue = ratingObj.rating;
-          const currentTier = RATING_TIERS.find(tier =>
-              currentRatingValue >= tier.min && (tier.max === Infinity || currentRatingValue < tier.max)
-          );
-          currentTierNameDisplayEl.textContent = currentTier ? currentTier.name : 'N/A';
-      }
+            statusIndicatorEl.textContent = "Active";
+            statusIndicatorEl.className = "inline-block bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-1 rounded-full";
 
-    } else {
-      currentRatingEl.textContent = "Inactive";
-      updateProgressBar(0);
+            if (currentTierNameDisplayEl) {
+                    const currentTier = RATING_TIERS.find(tier => parsedRating >= tier.min && (tier.max === Infinity || parsedRating < tier.max));
+                    currentTierNameDisplayEl.textContent = currentTier ? currentTier.name : 'N/A';
+            }
+        } else {
+            console.debug('No numeric rating found for user', currentUserId, 'ratings payload:', data);
+            currentRatingEl.textContent = "N/A";
+            updateProgressBar(0);
 
-      statusIndicatorEl.textContent = "Inactive";
-      statusIndicatorEl.className = "inline-block bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full";
+            statusIndicatorEl.textContent = "N/A";
+            statusIndicatorEl.className = "inline-block bg-gray-100 text-gray-700 text-xs font-semibold px-2 py-1 rounded-full";
 
-      if (currentTierNameDisplayEl) {
-          currentTierNameDisplayEl.textContent = `N/A`;
-      }
+            if (currentTierNameDisplayEl) {
+                    currentTierNameDisplayEl.textContent = `N/A`;
+            }
     }
   } catch (err) {
     console.error("Error fetching current rating:", err);

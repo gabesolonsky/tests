@@ -1,5 +1,7 @@
 // Global variable for the current user's ID
 let userId;
+// Global AbortController to cancel requests on navigation
+let abortController = new AbortController();
 
 // Define RATING_TIERS globally for consistency
 const RATING_TIERS = [
@@ -29,7 +31,7 @@ function toggleSidebar() {
  */
 async function fetchCurrentUserRating(currentUserId) {
   try {
-    const res = await fetch(`/proxy/user/${currentUserId}/ratings`);
+    const res = await fetch(`/proxy/user/${currentUserId}/ratings`, { signal: abortController.signal });
     if (!res.ok) throw new Error(`Network response was not ok. Status: ${res.status}`);
     const data = await res.json();
 
@@ -37,42 +39,72 @@ async function fetchCurrentUserRating(currentUserId) {
     const statusIndicatorEl = document.getElementById("status-indicator");
     const currentTierNameDisplayEl = document.getElementById('current-tier-name-display');
 
-    const ratingObj = data.find(r => r.ratingTypeName === "Singles International Rating");
+        // Try to find the Singles International Rating entry (case-insensitive 'singles').
+        let ratingObj = data.find(r => /singles/i.test(r.ratingTypeName || '')) || data.find(r => r.ratingTypeName === "Singles International Rating");
 
-    if (ratingObj && typeof ratingObj.rating === 'number' && !isNaN(ratingObj.rating)) {
-      const currentRating = ratingObj.rating;
-      currentRatingEl.textContent = `${currentRating.toFixed(2)}`;
-      statusIndicatorEl.textContent = "Active";
-      statusIndicatorEl.className = "inline-block bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-1 rounded-full";
+        // Helper to extract a numeric rating from possible fields
+        const extractNumeric = (obj) => {
+            if (!obj) return NaN;
+            const candidates = [obj.rating, obj.Rating, obj.value, obj.ratingValue];
+            for (const c of candidates) {
+                const parsed = parseFloat(c);
+                if (!isNaN(parsed)) return parsed;
+            }
+            return NaN;
+        };
+
+        let parsedRating = extractNumeric(ratingObj);
+
+        // If not found yet, look for any entry that has a numeric rating (prefer singles if possible)
+        if (isNaN(parsedRating)) {
+            // first try any entry with 'singles' in the type
+            const singlesFallback = data.find(r => /singles/i.test(r.ratingTypeName || ''));
+            if (singlesFallback) parsedRating = extractNumeric(singlesFallback);
+        }
+        if (isNaN(parsedRating)) {
+            // otherwise use the first numeric rating we can find
+            for (const entry of data) {
+                const v = extractNumeric(entry);
+                if (!isNaN(v)) { parsedRating = v; break; }
+            }
+        }
+
+        if (!isNaN(parsedRating)) {
+            const currentRating = parsedRating;
+            currentRatingEl.textContent = `${currentRating.toFixed(2)}`;
+            statusIndicatorEl.textContent = "Active";
+            statusIndicatorEl.className = "inline-block bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-1 rounded-full";
       
-      const currentTier = RATING_TIERS.find(tier => currentRating >= tier.min && currentRating < tier.max);
-      const currentTierIndex = RATING_TIERS.findIndex(tier => currentRating >= tier.min && currentRating < tier.max);
+            const currentTier = RATING_TIERS.find(tier => currentRating >= tier.min && currentRating < tier.max);
+            const currentTierIndex = RATING_TIERS.findIndex(tier => currentRating >= tier.min && currentRating < tier.max);
 
-      if (currentTierNameDisplayEl) {
-        currentTierNameDisplayEl.textContent = currentTier ? currentTier.name : 'N/A';
-      }
+            if (currentTierNameDisplayEl) {
+                currentTierNameDisplayEl.textContent = currentTier ? currentTier.name : 'N/A';
+            }
       
-      const tooltipContentEl = document.getElementById('rating-tooltip-content');
-      if (tooltipContentEl && currentTier && currentTierIndex < RATING_TIERS.length - 1) {
-          const nextTier = RATING_TIERS[currentTierIndex + 1];
-          const ratingNeeded = nextTier.min - currentRating;
-          tooltipContentEl.innerHTML = `
-              <p><span class="font-semibold">Current Tier:</span> ${currentTier.name} (${currentTier.min} - ${nextTier.min})</p>
-              <p><span class="font-semibold">Next Tier:</span> ${nextTier.name} (${nextTier.min}+)</p>
-              <hr class="my-1 border-gray-600">
-              <p>You need <span class="font-bold text-indigo-300">${ratingNeeded.toFixed(2)}</span> more points to reach the ${nextTier.name} tier.</p>
-          `;
-      } else if (tooltipContentEl) {
-          tooltipContentEl.innerHTML = '<p>You are at the highest tier!</p>';
-      }
+            const tooltipContentEl = document.getElementById('rating-tooltip-content');
+            if (tooltipContentEl && currentTier && currentTierIndex < RATING_TIERS.length - 1) {
+                    const nextTier = RATING_TIERS[currentTierIndex + 1];
+                    const ratingNeeded = nextTier.min - currentRating;
+                    tooltipContentEl.innerHTML = `
+                            <p><span class="font-semibold">Current Tier:</span> ${currentTier.name} (${currentTier.min} - ${nextTier.min})</p>
+                            <p><span class="font-semibold">Next Tier:</span> ${nextTier.name} (${nextTier.min}+)</p>
+                            <hr class="my-1 border-gray-600">
+                            <p>You need <span class="font-bold text-indigo-300">${ratingNeeded.toFixed(2)}</span> more points to reach the ${nextTier.name} tier.</p>
+                    `;
+            } else if (tooltipContentEl) {
+                    tooltipContentEl.innerHTML = '<p>You are at the highest tier!</p>';
+            }
 
-    } else {
-      currentRatingEl.textContent = "N/A";
-      statusIndicatorEl.textContent = "Inactive";
-      statusIndicatorEl.className = "inline-block bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full";
-      if (currentTierNameDisplayEl) {
-          currentTierNameDisplayEl.textContent = 'N/A';
-      }
+        } else {
+            // No valid rating available — show neutral N/A instead of marking the player "Inactive".
+            console.debug('No numeric rating found for user', currentUserId, 'ratings payload:', data);
+            currentRatingEl.textContent = "N/A";
+            statusIndicatorEl.textContent = "N/A";
+            statusIndicatorEl.className = "inline-block bg-gray-100 text-gray-700 text-xs font-semibold px-2 py-1 rounded-full";
+            if (currentTierNameDisplayEl) {
+                    currentTierNameDisplayEl.textContent = 'N/A';
+            }
     }
   } catch (err) {
     console.error("Error fetching current rating:", err);
@@ -90,7 +122,7 @@ async function fetchWeeklyRankings(currentUserId) {
     rankingsContainer.innerHTML = '<p class="text-center text-gray-500 mt-10">Loading rankings...</p>';
 
     try {
-        const rankingsResponse = await fetch(`/proxy/user/${currentUserId}/rankings`);
+        const rankingsResponse = await fetch(`/proxy/user/${currentUserId}/rankings`, { signal: abortController.signal });
         if (!rankingsResponse.ok) throw new Error(`Rankings API HTTP error! status: ${rankingsResponse.status}`);
         
         const rankingsData = await rankingsResponse.json();
@@ -158,7 +190,7 @@ async function fetchWeeklyRankings(currentUserId) {
  */
 async function fetchMatchStatistics(currentUserId) {
     try {
-        const response = await fetch(`/proxy/user/${currentUserId}/record`);
+        const response = await fetch(`/proxy/user/${currentUserId}/record`, { signal: abortController.signal });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         
         const recordData = await response.json();
@@ -212,7 +244,7 @@ async function calculateAverageOpponentRating(matchesToConsider, allMatches) {
         const opponentId = match.wid1 === parseInt(userId) ? match.oid1 : match.wid1;
         if (opponentId && opponentId !== -1) {
             try {
-                const res = await fetch(`/proxy/user/${opponentId}/ratings-top`);
+                const res = await fetch(`/proxy/user/${opponentId}/ratings-top`, { signal: abortController.signal });
                 if (!res.ok) return null;
                 const ratingData = await res.json();
                 return (ratingData && ratingData.length > 0 && typeof ratingData[0].rating === 'number') ? ratingData[0].rating : null;
@@ -245,7 +277,7 @@ async function fetchAndDisplayMonthlyRatingChanges(currentUserId) {
     container.innerHTML = '<p class="text-center text-gray-500 mt-10">Loading data...</p>';
 
     try {
-        const response = await fetch(`/proxy/user/${currentUserId}/rankings`);
+        const response = await fetch(`/proxy/user/${currentUserId}/rankings`, { signal: abortController.signal });
         if (!response.ok) throw new Error(`API error: ${response.status}`);
         const rankingsData = await response.json();
         const allDivisionRatings = rankingsData.filter(entry => entry.DivisionName === "All");
@@ -341,7 +373,7 @@ async function fetchAndDisplayTopOpponents(currentUserId, allMatches) {
     const ratingPromises = Array.from(opponentData.keys()).map(async (id) => {
         if (id && id !== -1) {
             try {
-                const res = await fetch(`/proxy/user/${id}/ratings-top`);
+                const res = await fetch(`/proxy/user/${id}/ratings-top`, { signal: abortController.signal });
                 if (!res.ok) return;
                 const ratingData = await res.json();
                 if (ratingData && ratingData.length > 0 && typeof ratingData[0].rating === 'number') {
@@ -395,7 +427,7 @@ async function fetchAllMatches(currentUserId) {
     let hasMore = true;
     while (hasMore) {
         try {
-            const response = await fetch(`/proxy/user/${currentUserId}/matches/page/${page}`);
+            const response = await fetch(`/proxy/user/${currentUserId}/matches/page/${page}`, { signal: abortController.signal });
             if (!response.ok) { hasMore = false; continue; }
             const data = await response.json();
             if (data.matches && data.matches.length > 0) {
@@ -423,7 +455,7 @@ async function performSearch(query) {
     searchResultsContainer.innerHTML = '<div class="p-2 text-gray-500">Searching...</div>';
     searchResultsContainer.classList.remove('hidden');
     try {
-        const response = await fetch(apiUrl);
+        const response = await fetch(apiUrl, { signal: abortController.signal });
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         displaySearchResults(await response.json());
     } catch (error) {
@@ -503,7 +535,7 @@ async function fetchAdvancedMatchInsights(allMatches) {
 
     await Promise.all(allMatches.map(async (match) => {
         try {
-            const res = await fetch(`/proxy/liveScoreDetails?match_id=${match.Matchid}`);
+            const res = await fetch(`/proxy/liveScoreDetails?match_id=${match.Matchid}`, { signal: abortController.signal });
             if (!res.ok) return;
             const details = await res.json();
             if (!details || details.length < 2) return;
@@ -631,7 +663,7 @@ async function loadMatchInsights(match, container) {
     
     let data;
     try {
-        const response = await fetch(`/proxy/liveScoreDetails?match_id=${match_id}`);
+        const response = await fetch(`/proxy/liveScoreDetails?match_id=${match_id}`, { signal: abortController.signal });
         if (!response.ok) throw new Error("Proxy response not ok");
         data = await response.json();
     } catch (error) {
@@ -795,29 +827,39 @@ function setupModalListeners() {
  * @param {string} currentUserId - The ID of the user whose data to load.
  */
 async function initializePage(currentUserId) {
+    // Reset abort controller for new page load
+    abortController = new AbortController();
+    // Abort requests when navigating away
+    window.addEventListener('beforeunload', () => abortController.abort());
+
     lucide.createIcons();
+    // Show the updated date immediately so the user sees the timestamp before other data loads
+    const lastUpdatedEl = document.getElementById('last-updated-date');
+    if (lastUpdatedEl) lastUpdatedEl.textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
     try {
-        const response = await fetch(`/proxy/user/${currentUserId}`);
+        const response = await fetch(`/proxy/user/${currentUserId}`, { signal: abortController.signal });
         const userData = await response.json();
         document.getElementById('welcome-message').textContent = `Welcome Back, ${userData.firstName} 🎉`;
     } catch (e) {
-        console.error("Could not fetch user's name", e);
-        document.getElementById('welcome-message').textContent = `Welcome Back 🎉`;
+        if (e.name !== 'AbortError') {
+            console.error("Could not fetch user's name", e);
+            document.getElementById('welcome-message').textContent = `Welcome Back 🎉`;
+        }
     }
 
     fetchCurrentUserRating(currentUserId);
     fetchWeeklyRankings(currentUserId);
     fetchAndDisplayMonthlyRatingChanges(currentUserId);
     fetchMatchStatistics(currentUserId);
-    
+
     const allMatches = await fetchAllMatches(currentUserId);
-    
+
     calculateAverageOpponentRating(25, allMatches);
     fetchAndDisplayTopOpponents(currentUserId, allMatches);
     displayLastMatch(currentUserId, allMatches);
-    fetchAdvancedMatchInsights(allMatches); 
+    fetchAdvancedMatchInsights(allMatches);
     setupModalListeners();
-    
+
     document.getElementById('last-updated-date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 

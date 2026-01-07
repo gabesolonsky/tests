@@ -8,10 +8,63 @@
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
+  <style>
+    /* hide scrollbars for standings lists but keep scrolling */
+    .standings-list { -ms-overflow-style: none; scrollbar-width: none; }
+    .standings-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    /* subtle shadow when column header is sticky inside scroll area */
+    .standings-columns > .grid { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    /* responsive grid for standings so header columns align with rows */
+    .standings-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    @media (min-width: 768px) {
+      /* Rank | Team (flexible) | Wins-Losses | Individual Matches | Win% */
+      .standings-grid { grid-template-columns: 48px 1fr 96px 128px 72px; }
+    }
+    /* small spinner for loading roster */
+    .spinner { border: 4px solid rgba(0,0,0,0.08); border-left-color: #7c3aed; border-radius: 9999px; width: 32px; height: 32px; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* player hover chart container interactive styles */
+    #player-hover-chart { transition: transform .12s ease, opacity .12s ease; opacity: 0; }
+    #player-hover-chart.show { opacity: 1; transform: translateY(0); }
+    /* ensure team modal body can scroll and hide scrollbars */
+    #team-preview-body { max-height: 60vh; overflow-y: auto; -ms-overflow-style: none; scrollbar-width: none; }
+    #team-preview-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    /* make the team preview logo feel interactive and layout CTA buttons nicely */
+    #team-preview-logo { cursor: pointer; }
+    @media (max-width: 640px) {
+      /* stack header CTAs on small screens */
+      #team-preview-modal .flex.items-start.justify-between { flex-direction: column; gap: 8px; }
+      #team-preview-modal .flex-shrink-0.flex.items-center.gap-2 { width: 100%; justify-content: flex-end; }
+    }
+    /* ensure roster & schedule columns are independently scrollable and hide scrollbar chrome */
+    #team-preview-roster, #team-preview-schedule { max-height: 70vh; -ms-overflow-style: none; scrollbar-width: none; }
+    #team-preview-roster::-webkit-scrollbar, #team-preview-schedule::-webkit-scrollbar { display: none; width: 0; height: 0; }
+    /* Mobile improvements for team containers */
+    @media (max-width: 768px) {
+      .team-container { padding: 1rem !important; margin-bottom: 1rem; }
+      .team-card { padding: 1rem; margin-bottom: 0.5rem; border-radius: 12px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+      .team-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+      .team-card h3 { font-size: 1.125rem; margin-bottom: 0.5rem; }
+      .team-card p { font-size: 0.875rem; }
+      /* Mobile standings improvements */
+      .standings-grid { display: flex; flex-direction: column; gap: 0.5rem; }
+      .standings-grid > div { display: flex; justify-content: space-between; align-items: center; padding: 0.25rem 0; }
+      .standings-grid > div:first-child { font-weight: 600; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; margin-bottom: 0.5rem; }
+      .standings-grid > div:not(:first-child) { border-bottom: 1px solid #f3f4f6; }
+      .standings-grid > div > div { flex: 1; text-align: left; }
+      .standings-grid > div > div:nth-child(1) { flex: 0 0 60px; font-weight: 500; } /* Rank */
+      .standings-grid > div > div:nth-child(2) { flex: 1; } /* Team */
+      .standings-grid > div > div:nth-child(3) { flex: 0 0 80px; text-align: center; } /* Wins-Losses */
+      .standings-grid > div > div:nth-child(4) { flex: 0 0 100px; text-align: center; } /* Individual Matches */
+      .standings-grid > div > div:nth-child(5) { flex: 0 0 60px; text-align: center; } /* Win % */
+      .standings-row { padding: 0.75rem 0; border-radius: 8px; transition: background-color 0.2s ease; }
+      .standings-row:hover { background-color: #f9fafb; }
+    }
+  </style>
 </head>
 <body class="bg-gray-100 antialiased text-gray-900">
   <div class="flex h-screen overflow-hidden sidebar-expanded" id="app">
-    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
+    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300 md:translate-x-0 -translate-x-full">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
         <div class="flex items-center space-x-2">
           <img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
@@ -28,37 +81,39 @@
         <div>
             <p class="text-gray-500 uppercase sidebar-text">Profile</p>
             <ul class="mt-2 space-y-1">
-                <li><a href="dashboard" id="dashboard-link" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="sidebar-text">Dashboard</span></a></li>
-                <li><a href="analytics" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="bar-chart" class="w-5 h-5"></i><span class="sidebar-text">Analytics</span></a></li>
-                <li><a href="playertracker" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="user-round-search" class="w-5 h-5"></i><span class="sidebar-text">Advanced Player Tracker</span></a></li>
+                <li><a href="/dashboard" id="dashboard-link" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="sidebar-text">Dashboard</span></a></li>
+                <li><a href="/analytics" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="bar-chart" class="w-5 h-5"></i><span class="sidebar-text">Analytics</span></a></li>
+                <li><a href="/playertracker" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="user-round-search" class="w-5 h-5"></i><span class="sidebar-text">Advanced Player Tracker</span></a></li>
             </ul>
         </div>
 
         <div>
             <p class="text-gray-500 uppercase sidebar-text">Players</p>
             <ul class="mt-2 space-y-1">
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar" class="w-5 h-5"></i><span class="sidebar-text">Events</span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Rankings</span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="columns-3" class="w-5 h-5"></i><span class="sidebar-text">Leagues</span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="house" class="w-5 h-5"></i><span class="sidebar-text">Clubs</span></a></li>
+
+                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar" class="w-5 h-5"></i><span class="sidebar-text">Events <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Rankings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="columns-3" class="w-5 h-5"></i><span class="sidebar-text">Leagues <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="house" class="w-5 h-5"></i><span class="sidebar-text">Clubs <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
             </ul>
         </div>
 
         <div>
             <p class="text-gray-500 uppercase sidebar-text">College Squash Association</p>
             <ul class="mt-2 space-y-1">
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="university" class="w-5 h-5"></i><span class="sidebar-text">Home</span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-purple-600"><i data-lucide="university" class="w-5 h-5"></i><span class="sidebar-text">Teams</span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule</span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings</span></a></li>
+
+                  <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-100 text-purple-600"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams</span></a></li>
+                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
             </ul>
         </div>
 
         <div>
             <p class="text-gray-500 uppercase sidebar-text">Other</p>
             <ul class="mt-2 space-y-1">
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="life-buoy" class="w-5 h-5"></i><span class="sidebar-text">Help</span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Settings</span></a></li>
+
+                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="life-buoy" class="w-5 h-5"></i><span class="sidebar-text">Help <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Settings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
             </ul>
         </div>
 
@@ -74,27 +129,19 @@
     </aside>
 
     <main class="flex-1 overflow-y-auto p-6">
-      <div class="flex justify-between items-center mb-6">
+      <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
         <div>
           <h1 id="welcome-message" class="text-2xl font-semibold tracking-tight">College Teams Overview</h1>
           <p class="text-sm text-gray-500">Explore team performance and analytics.</p>
         </div>
-        <div class="relative">
-          <input
-            type="text"
-            placeholder="Search teams..."
-            class="pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm"
-          />
-          <svg
-            class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
-          </svg>
+        <!-- Mobile tab bar: visible only on small screens -->
+        <div class="md:hidden w-full">
+          <div class="flex gap-2 bg-white/70 backdrop-blur-md border border-gray-200 rounded-xl p-1 shadow-sm">
+            <button onclick="showCollegeTab('college-dashboard')" class="flex-1 px-4 py-3 rounded-lg bg-purple-100 text-purple-800 text-sm font-medium transition-all active:scale-95">Overview</button>
+            <button onclick="showCollegeTab('college-analytics')" class="flex-1 px-4 py-3 rounded-lg bg-gray-100 text-gray-700 text-sm font-medium transition-all active:scale-95">Analytics</button>
+          </div>
         </div>
+        <!-- Search removed for this page -->
       </div>
 
       <section id="college-analytics" class="college-tab-content hidden">
@@ -110,193 +157,82 @@
             </div>
             <div class="bg-red-50 p-4 rounded-lg shadow-sm">
                 <h3 class="font-semibold text-lg text-red-800">Player Contribution Breakdown</h3>
-                <p class="text-red-700">Detailed statistics on individual player impact within teams.</p>
+                <div class="h-64 flex items-center justify-center">
+                    <div class="text-center">
+                        <div class="text-4xl mb-4">🚧</div>
+                        <p class="text-gray-600 font-medium">Coming Soon</p>
+                        <p class="text-sm text-gray-500 mt-2">Detailed player analytics will be available here.</p>
+                    </div>
+                </div>
             </div>
           </div>
         </div>
       </section>
 
+      </section>
+
+      <section id="college-dashboard" class="college-tab-content">
         <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
-          <h2 class="text-xl font-semibold mb-4 text-gray-800">All College Teams</h2>
+          <!-- Page title removed per request -->
           <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div id="mens-varsity-container" class="bg-blue-50 p-4 rounded-lg shadow-sm">
-                <h3 class="font-semibold text-lg text-blue-800 mb-4">Men's Varsity Teams</h3>
-                <div id="mens-varsity-content" class="grid grid-cols-1 gap-4">
-                    <p class="text-center text-gray-500 mt-10">Loading men's varsity teams data...</p>
-                </div>
+            <div id="mens-varsity-container" class="bg-purple-50 p-6 rounded-xl shadow-sm">
+              <div id="mens-varsity-content" class="grid grid-cols-1 gap-6">
+                <p class="text-center text-gray-500 mt-10">Loading men's varsity teams data...</p>
+              </div>
             </div>
 
-            <div id="womens-varsity-container" class="bg-blue-50 p-4 rounded-lg shadow-sm">
-                <h3 class="font-semibold text-lg text-blue-800 mb-4">Women's Varsity Teams</h3>
-                <div id="womens-varsity-content" class="grid grid-cols-1 gap-4">
-                    <p class="text-center text-gray-500 mt-10">Loading women's varsity teams data...</p>
-                </div>
+            <div id="womens-varsity-container" class="bg-purple-50 p-6 rounded-xl shadow-sm">
+              <div id="womens-varsity-content" class="grid grid-cols-1 gap-6">
+                <p class="text-center text-gray-500 mt-10">Loading women's varsity teams data...</p>
+              </div>
             </div>
 
-            <div id="womens-club-container" class="bg-blue-50 p-4 rounded-lg shadow-sm">
-                <h3 class="font-semibold text-lg text-blue-800 mb-4">Women's Club Teams</h3>
-                <div id="womens-club-content" class="grid grid-cols-1 gap-4">
-                    <p class="text-center text-gray-500 mt-10">Loading women's club teams data...</p>
-                </div>
+            <div id="womens-club-container" class="bg-purple-50 p-6 rounded-xl shadow-sm">
+              <div id="womens-club-content" class="grid grid-cols-1 gap-6">
+                <p class="text-center text-gray-500 mt-10">Loading women's club teams data...</p>
+              </div>
             </div>
 
-            <div id="mixed-club-container" class="bg-blue-50 p-4 rounded-lg shadow-sm">
-                <h3 class="font-semibold text-lg text-blue-800 mb-4">Mixed Club Teams</h3>
-                <div id="mixed-club-content" class="grid grid-cols-1 gap-4">
-                    <p class="text-center text-gray-500 mt-10">Loading mixed club teams data...</p>
-                </div>
+            <div id="mixed-club-container" class="bg-purple-50 p-6 rounded-xl shadow-sm">
+              <div id="mixed-club-content" class="grid grid-cols-1 gap-6">
+                <p class="text-center text-gray-500 mt-10">Loading mixed club teams data...</p>
+              </div>
             </div>
           </div>
-        </div>
-      
+            </section>
+
+            <!-- Team details panel (hidden until a team is selected) -->
+            <section id="team-details" class="hidden mt-6 bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h2 id="team-title" class="text-xl font-semibold text-gray-800">Team</h2>
+                  <p id="team-sub" class="text-sm text-gray-500">Roster</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button id="back-to-team-list" class="text-sm px-3 py-2 rounded bg-gray-100 hover:bg-gray-200">Back</button>
+                </div>
+              </div>
+              <div id="team-roster" class="grid gap-3">
+                <p class="text-sm text-gray-500">Select a team to view roster.</p>
+              </div>
+            </section>
+
     </main>
+
+    <!-- Mobile bottom navigation -->
+    <div id="mobile-nav" class="mobile-bottom-nav md:hidden" role="navigation" aria-label="Mobile navigation">
+      <button class="mobile-nav-btn" data-target="/dashboard" aria-label="Dashboard"><i data-lucide="home"></i><span>Dashboard</span></button>
+      <button class="mobile-nav-btn" data-target="/analytics" aria-label="Analytics"><i data-lucide="bar-chart-2"></i><span>Analytics</span></button>
+      <button class="mobile-nav-btn" data-target="/playertracker" aria-label="Tracker"><i data-lucide="user"></i><span>Tracker</span></button>
+      <button class="mobile-nav-btn" data-target="/collegeteams" aria-label="Teams"><i data-lucide="users"></i><span>Teams</span></button>
+    </div>
   </div>
 
-<script>
-    // Toggles the sidebar visibility
-    function toggleSidebar() {
-        document.getElementById("app").classList.toggle("sidebar-collapsed");
-    }
-
-  // Tab switching logic for college teams page
-  function showCollegeTab(tabId) {
-    // Hide all tab content sections
-    document.querySelectorAll(".college-tab-content").forEach((tab) => {
-      tab.classList.add("hidden");
-    });
-    // Show the selected tab content section
-    document.getElementById(tabId).classList.remove("hidden");
-
-    // Update active link styling in sidebar
-    document.querySelectorAll(".college-nav-link").forEach((link) => {
-      link.classList.remove("text-purple-600");
-      link.classList.add("text-gray-700");
-    });
-    // Add active styling to the clicked link
-    const activeLink = document.querySelector(`[onclick="showCollegeTab('${tabId}')"]`);
-    if (activeLink) {
-        activeLink.classList.remove("text-gray-700");
-        activeLink.classList.add("text-purple-600");
-    }
-  }
-
-  // Function to fetch and display teams
-  async function fetchAndDisplayTeams() {
-      const apiUrl = "https://api.ussquash.com/resources/leagues/info/2200";
-
-      try {
-          const response = await fetch(apiUrl);
-          if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          const teamsData = await response.json();
-
-          const mensVarsity = teamsData.filter(team => team.LeagueDescr === "CSA Men's Varsity");
-          const womensVarsity = teamsData.filter(team => team.LeagueDescr === "CSA Women's Varsity");
-          const womensClub = teamsData.filter(team => team.LeagueDescr === "CSA Women's Club Teams");
-          const mixedClub = teamsData.filter(team => team.LeagueDescr === "CSA Mixed Club Teams");
-
-          function renderTeams(containerId, teams) {
-              const container = document.getElementById(containerId);
-              container.innerHTML = ''; // Clear loading message
-              if (teams.length === 0) {
-                  container.innerHTML = '<p class="text-gray-500 col-span-full">No teams found for this category.</p>';
-                  return;
-              }
-              teams.forEach(team => {
-                  const teamCard = `
-                      <div class="bg-white p-4 rounded-lg shadow-sm">
-                          <h4 class="font-semibold text-md text-gray-800">${team.LeagueDescr}</h4>
-                          <p class="text-gray-700">Number of Teams: ${team.NumTeams}</p>
-                          <p class="text-gray-700">Season: ${team.SeasonDescr}</p>
-                          ${team.LogoImageUrl ? `<img src="${team.LogoImageUrl}" alt="${team.LeagueDescr} logo" class="mt-2 w-12 h-12 object-contain">` : ''}
-                      </div>
-                  `;
-                  container.insertAdjacentHTML('beforeend', teamCard);
-              });
-          }
-
-          renderTeams('mens-varsity-content', mensVarsity);
-          renderTeams('womens-varsity-content', womensVarsity);
-          renderTeams('womens-club-content', womensClub);
-          renderTeams('mixed-club-content', mixedClub);
-
-      } catch (error) {
-          console.error("Error fetching or parsing team data:", error);
-          document.getElementById('mens-varsity-content').innerHTML = '<p class="text-red-500 col-span-full">Failed to load data for Men\'s Varsity.</p>';
-          document.getElementById('womens-varsity-content').innerHTML = '<p class="text-red-500 col-span-full">Failed to load data for Women\'s Varsity.</p>';
-          document.getElementById('womens-club-content').innerHTML = '<p class="text-red-500 col-span-full">Failed to load data for Women\'s Club.</p>';
-          document.getElementById('mixed-club-content').innerHTML = '<p class="text-red-500 col-span-full">Failed to load data for Mixed Club Teams.</p>';
-      }
-  }
-
-  // Set initial tab on page load and fetch data
-  document.addEventListener("DOMContentLoaded", () => {
-    showCollegeTab("college-dashboard"); // Default to showing the dashboard tab
-    fetchAndDisplayTeams(); // Fetch team data for all sections
-
-    // Example ApexCharts for Analytics Tab (you'll replace this with real data)
-    const chartOptions = {
-        series: [{
-            name: 'Wins',
-            data: [44, 55, 57, 56, 61, 58, 63, 60, 66]
-        }, {
-            name: 'Losses',
-            data: [76, 85, 101, 98, 87, 105, 91, 114, 94]
-        }],
-        chart: {
-            type: 'bar',
-            height: 250,
-            toolbar: {
-                show: false
-            }
-        },
-        plotOptions: {
-            bar: {
-                horizontal: false,
-                columnWidth: '55%',
-                endingShape: 'rounded'
-            },
-        },
-        dataLabels: {
-            enabled: false
-        },
-        stroke: {
-            show: true,
-            width: 2,
-            colors: ['transparent']
-        },
-        xaxis: {
-            categories: ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct'],
-        },
-        yaxis: {
-            title: {
-                text: 'Number of Matches'
-            }
-        },
-        fill: {
-            opacity: 1
-        },
-        tooltip: {
-            y: {
-                formatter: function (val) {
-                    return val + " matches"
-                }
-            }
-        },
-        colors: ['#4CAF50', '#F44336'] // Green for wins, Red for losses
-    };
-
-    const chartElement = document.querySelector('#team-performance-chart');
-    if (chartElement) {
-        // Clear placeholder text before rendering chart
-        chartElement.innerHTML = ''; 
-        const chart = new ApexCharts(chartElement, chartOptions);
-        chart.render();
-    }
-  });
-
-  lucide.createIcons();
-</script>
+<script src="{{ url_for('static', filename='collegeteams.js') }}"></script>
+<script src="{{ url_for('static', filename='mobile-nav.js') }}"></script>
+        <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
+        <script> if(window.lucide) lucide.createIcons(); </script>
+      </body>
+      </html>
 </body>
 </html>
