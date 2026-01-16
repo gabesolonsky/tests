@@ -109,16 +109,26 @@ async function fetchAndRenderSectionStandings(containerId, divisionId) {
     }
     columnsHolder.innerHTML = '';
 
-    // Header row for columns: Rank | Team | Wins - Losses | Individual Matches | Win %
+    // Check if mobile
+    const isMobile = window.innerWidth <= 767;
+
+    // Header row for columns: Rank | Team | (Wins-Losses | Individual Matches | Win % on desktop only)
     const header = document.createElement('div');
     header.className = 'grid standings-grid gap-3 items-center py-2 border-b bg-gray-50 text-xs text-gray-500 font-medium';
-    header.innerHTML = `
-      <div class="text-center">Rank</div>
-      <div class="pl-2 text-center">Team</div>
-      <div class="text-center">Wins - Losses</div>
-      <div class="text-center">Individual Matches</div>
-      <div class="text-center">Win %</div>
-    `;
+    if (isMobile) {
+      header.innerHTML = `
+        <div class="text-center">Rank</div>
+        <div class="pl-2">Team</div>
+      `;
+    } else {
+      header.innerHTML = `
+        <div class="text-center">Rank</div>
+        <div class="pl-2 text-center">Team</div>
+        <div class="text-center">Wins - Losses</div>
+        <div class="text-center">Individual Matches</div>
+        <div class="text-center">Win %</div>
+      `;
+    }
     columnsHolder.appendChild(header);
 
     rowsHolder.innerHTML = '';
@@ -167,25 +177,39 @@ async function fetchAndRenderSectionStandings(containerId, divisionId) {
 
       const rowEl = document.createElement('div');
       rowEl.className = 'grid standings-grid gap-4 items-center py-4 border-b last:border-b-0 hover:bg-gray-50 transition-colors cursor-pointer';
-      rowEl.innerHTML = `
-        <div class="w-12 text-sm text-gray-700 text-center">${rank}</div>
-        <div class="flex items-center gap-4 min-w-0 justify-center md:justify-start">
-          <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
-            ${logo ? `<img src="${logo}" alt="${name}" class="w-full h-full object-cover">` : `<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/></svg>`}
+      if (isMobile) {
+        rowEl.innerHTML = `
+          <div class="w-12 text-sm text-gray-700 text-center">${rank}</div>
+          <div class="flex items-center gap-4 min-w-0">
+            <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
+              ${logo ? `<img src="${logo}" alt="${name}" class="w-full h-full object-cover">` : `<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/></svg>`}
+            </div>
+            <div class="min-w-0">
+              <div class="text-base font-medium text-gray-800">${name}</div>
+            </div>
           </div>
-          <div class="min-w-0">
-            <div class="text-base font-medium text-gray-800 text-center md:text-left">${name}</div>
+        `;
+      } else {
+        rowEl.innerHTML = `
+          <div class="w-12 text-sm text-gray-700 text-center">${rank}</div>
+          <div class="flex items-center gap-4 min-w-0 justify-center md:justify-start">
+            <div class="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center flex-shrink-0">
+              ${logo ? `<img src="${logo}" alt="${name}" class="w-full h-full object-cover">` : `<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/></svg>`}
+            </div>
+            <div class="min-w-0">
+              <div class="text-base font-medium text-gray-800 text-center md:text-left">${name}</div>
+            </div>
           </div>
-        </div>
-        <div class="text-center text-sm text-gray-700">${winsLossesDisplay}</div>
-        <div class="text-center text-sm text-gray-700">${indDisplay}</div>
-        <div class="text-center text-sm text-gray-700">${pctDisplay}</div>
-      `;
+          <div class="text-center text-sm text-gray-700">${winsLossesDisplay}</div>
+          <div class="text-center text-sm text-gray-700">${indDisplay}</div>
+          <div class="text-center text-sm text-gray-700">${pctDisplay}</div>
+        `;
+      }
 
       // clicking a row shows the team roster (falls back to division view if no team id)
       rowEl.onclick = () => {
         const tid = getTeamIdFromRow(row);
-        if (tid) showTeamPreview(tid, name, logo);
+        if (tid) showTeamPreview(tid, name, logo, winsLossesDisplay, indDisplay, pctDisplay);
         else loadDivision(divisionId);
       };
 
@@ -314,7 +338,7 @@ function createTeamPreviewModal() {
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hideTeamPreview(); });
 }
 
-function showTeamPreview(teamId, teamName, teamLogo) {
+function showTeamPreview(teamId, teamName, teamLogo, winsLossesDisplay = '', indDisplay = '', pctDisplay = '') {
   createTeamPreviewModal();
   const wrap = document.getElementById('team-preview-modal');
   wrap.setAttribute('data-team', teamId);
@@ -325,7 +349,8 @@ function showTeamPreview(teamId, teamName, teamLogo) {
   const subEl = document.getElementById('team-preview-sub');
   const body = document.getElementById('team-preview-body');
   titleEl.textContent = teamName || `Team ${teamId}`;
-  subEl.textContent = `Team ID: ${teamId}`;
+  const isMobile = window.innerWidth <= 767;
+  subEl.innerHTML = `Team ID: ${teamId}${!isMobile && winsLossesDisplay ? ` • Wins-Losses: ${winsLossesDisplay}` : ''}${!isMobile && indDisplay ? ` • Individual Matches: ${indDisplay}` : ''}${!isMobile && pctDisplay ? ` • Win %: ${pctDisplay}` : ''}`;
   const logoEl = document.getElementById('team-preview-logo');
   if (logoEl) {
     const teamLogo = wrap.getAttribute('data-team-logo') || '';

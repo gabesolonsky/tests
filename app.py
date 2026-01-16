@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, redirect
 import requests
 import logging
 import os
@@ -11,6 +11,10 @@ COOKIES = {
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+@app.route("/")
+def index():
+    return redirect("/dashboard")
 
 @app.route("/proxy/user/<int:user_id>/rankings")
 def proxy_user_rankings(user_id):

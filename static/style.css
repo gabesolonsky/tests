@@ -160,30 +160,207 @@ main {
 /* helper to lock body scrolling when sidebar is open */
 .no-scroll { overflow: hidden; }
 
+/* Add padding to main on mobile to account for fixed bottom nav */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: 200px;
+  }
+}
+
+/* Mobile improvements for college teams page */
+@media (max-width: 767px) {
+  /* Improve mobile tab bar */
+  .mobile-tab-bar {
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .mobile-tab-btn {
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+  }
+
+  .mobile-tab-btn.active {
+    background: #7c3aed;
+    color: white;
+    transform: scale(0.98);
+  }
+
+  /* Team containers mobile layout */
+  .team-container {
+    padding: 1rem !important;
+    margin-bottom: 1rem;
+  }
+
+  .team-card {
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    border-radius: 12px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .team-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+
+  .team-card h3 {
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .team-card p {
+    font-size: 0.875rem;
+  }
+
+  /* Standings mobile improvements */
+  .standings-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .standings-grid > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+  }
+
+  .standings-grid > div:first-child {
+    font-weight: 600;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .standings-grid > div:not(:first-child) {
+    border-bottom: 1px solid #f3f4f6;
+    padding: 0.75rem 0;
+    border-radius: 8px;
+    transition: background-color 0.2s ease;
+  }
+
+  .standings-grid > div:not(:first-child):hover {
+    background-color: #f9fafb;
+  }
+
+  .standings-grid > div > div {
+    flex: 1;
+    text-align: left;
+  }
+
+  .standings-grid > div > div:nth-child(1) {
+    flex: 0 0 60px;
+    font-weight: 500;
+  }
+
+  .standings-grid > div > div:nth-child(2) {
+    flex: 1;
+    font-size: 0.875rem; /* Smaller text for team name on mobile */
+  }
+
+  .standings-grid > div > div:nth-child(3) {
+    flex: 0 0 80px;
+    text-align: center;
+  }
+
+  .standings-grid > div > div:nth-child(4) {
+    flex: 0 0 100px;
+    text-align: center;
+  }
+
+  .standings-grid > div > div:nth-child(5) {
+    flex: 0 0 60px;
+    text-align: center;
+  }
+
+  /* Team preview modal mobile improvements */
+  #team-preview-modal .relative {
+    margin: 1rem;
+    max-height: 90vh;
+  }
+
+  #team-preview-modal .bg-white {
+    border-radius: 16px;
+  }
+
+  #team-preview-modal .p-6 {
+    padding: 1rem;
+  }
+
+  #team-preview-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  #team-preview-roster, #team-preview-schedule {
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  /* Analytics section mobile */
+  .analytics-container {
+    padding: 1rem;
+  }
+
+  .analytics-card {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 12px;
+  }
+}
+
 /* Mobile bottom navigation bar */
 .mobile-bottom-nav { display: none; }
 @media (max-width: 767px) {
   .mobile-bottom-nav {
     display: flex;
     position: fixed;
-    bottom: env(safe-area-inset-bottom, 12px);
+    bottom: max(env(safe-area-inset-bottom), 12px);
     left: 50%;
     transform: translateX(-50%);
     z-index: 60;
-    width: calc(100% - 2rem);
+    width: calc(100% - 1.5rem);
     max-width: 640px;
-    background: rgba(255,255,255,0.94);
-    backdrop-filter: blur(6px);
-    padding: 0.35rem;
-    gap: 0.25rem;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+    padding: 0.5rem;
+    gap: 0.5rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
     align-items: center;
     justify-content: space-between;
+    border: 1px solid rgba(255,255,255,0.2);
   }
-  .mobile-nav-btn { flex: 1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:6px 4px; border-radius:8px; color: #6b7280; }
-  .mobile-nav-btn i { width:20px; height:20px; }
-  .mobile-nav-btn span { font-size: 11px; line-height: 1; }
+  .mobile-nav-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 4px;
+    border-radius: 12px;
+    color: #6b7280;
+    transition: all 0.2s ease;
+    min-height: 48px;
+  }
+  .mobile-nav-btn i { width: 20px; height: 20px; }
+  .mobile-nav-btn span { font-size: 10px; line-height: 1; font-weight: 500; }
   .mobile-nav-btn:focus { outline: 2px solid rgba(124,58,237,0.12); }
-  .mobile-nav-btn.active { color: #7c3aed; background: rgba(124,58,237,0.06); }
+  .mobile-nav-btn.active {
+    color: #7c3aed;
+    background: rgba(124,58,237,0.08);
+    transform: scale(0.98);
+  }
+  .mobile-nav-btn:hover { background: rgba(0,0,0,0.05); }
+
+  /* Add padding to completed matches widget on mobile to prevent button from being blocked */
+  .completed-matches-widget {
+    padding-bottom: 120px; /* Extra padding to account for mobile nav bar */
+  }
 }
