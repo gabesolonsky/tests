@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html class="scroll-smooth">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -11,12 +11,27 @@
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
 </head>
 <body class="bg-gray-100 antialiased text-gray-900">
-  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app">
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="fixed inset-0 bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 z-50 flex items-center justify-center" style="display: flex;">
+    <div class="text-center">
+      <!-- Modern Multi-Layer Spinner -->
+      <div class="relative mb-8">
+        <div class="animate-spin rounded-full h-20 w-20 border-4 border-purple-300 border-t-purple-600 mx-auto"></div>
+        <div class="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-400 animate-spin mx-auto" style="animation-duration: 1.5s;"></div>
+        <div class="absolute inset-0 rounded-full border-4 border-transparent border-b-purple-500 animate-spin mx-auto" style="animation-duration: 2s;"></div>
+      </div>
+
+      <!-- Animated Text -->
+      <h2 class="text-2xl font-bold text-purple-100 mb-2 animate-pulse">Welcome to Squash Stats</h2>
+      <p class="text-purple-200 text-lg font-medium tracking-wide">Loading your dashboard...</p>
+    </div>
+  </div>
+  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app" style="display: none;">
     <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
         <div class="flex items-center space-x-2">
           <img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
-          <span class="text-xl font-semibold sidebar-text">US Squash</span>
+          <span class="text-xl font-semibold sidebar-text">Squash Stats</span>
         </div>
         <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevrons-left"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
@@ -245,7 +260,7 @@
 
         <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-4 md:p-6 shadow-xl font-sans flex flex-col completed-matches-widget">
             <h2 class="text-base md:text-lg font-semibold mb-2">Completed Matches</h2>
-              <div id="matches-container" class="space-y-3 overflow-y-auto pr-2 no-scrollbar max-h-64 md:max-h-96"></div>
+              <div id="matches-container" class="space-y-3 overflow-y-auto pr-2 no-scrollbar"></div>
               <div id="loading-matches-indicator" class="text-center py-2" style="display:none;">
                   <svg class="animate-spin h-5 w-5 text-gray-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -253,7 +268,11 @@
                   </svg>
                   <p class="text-sm text-gray-500 mt-1">Loading more matches...</p>
               </div>
-              <button id="load-more-matches-btn" class="mt-4 w-full bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-700 hover:to-indigo-800 text-white text-sm md:text-base font-semibold py-2 md:py-3 px-4 md:px-6 rounded-xl shadow-lg transition-all duration-300 ease-in-out">Load More Matches</button>
+              <button id="back-to-top-btn" class="fixed bottom-20 right-4 bg-indigo-600 text-white p-3 rounded-full shadow-lg opacity-0 transition-opacity duration-200 hidden" onclick="document.getElementById('matches-container').scrollTo({top: 0, behavior: 'smooth'});">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 15l-6-6-6 6"/>
+                </svg>
+              </button>
               <p id="no-more-matches-message" class="text-center text-gray-500 mt-4" style="display:none;">No more matches to load.</p>
           </div>
         </div>

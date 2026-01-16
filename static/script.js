@@ -813,6 +813,10 @@ function displaySearchResults(results) {
 
 // Function to load all dashboard data for a given userId
 async function loadPlayerProfile(newUserId) {
+    // Show loading overlay
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) loadingOverlay.style.display = 'flex';
+
     userId = newUserId; // Update the global userId
 
     // Update the URL with the new userId
@@ -824,7 +828,6 @@ async function loadPlayerProfile(newUserId) {
     sessionStorage.setItem(SESSION_STORAGE_KEY_USER_ID, newUserId);
     console.log(`Dashboard: Saved userId to session storage: ${newUserId}`);
 
-
     // Reset match loading state
     currentPageForMatches = 1;
     hasMoreMatches = true;
@@ -834,8 +837,6 @@ async function loadPlayerProfile(newUserId) {
     if (matchesContainer) {
         matchesContainer.innerHTML = '';
     }
-    const loadMoreBtn = document.getElementById('load-more-matches-btn');
-    if (loadMoreBtn) loadMoreBtn.style.display = 'block'; // Ensure button is visible for new profile
     const noMoreMatchesMessage = document.getElementById('no-more-matches-message');
     if (noMoreMatchesMessage) noMoreMatchesMessage.style.display = 'none'; // Hide no more matches message
 
@@ -843,16 +844,25 @@ async function loadPlayerProfile(newUserId) {
     const userName = await fetchAndRenderUserDetails(userId); // Get the user's name for match rendering
 
     if (userName) {
-        fetchUserRatings(userId);
-        fetchAndRenderRatings(userId);
-        fetchAndRenderMatchRecord(userId);
+        await Promise.all([
+            fetchUserRatings(userId),
+            fetchAndRenderRatings(userId),
+            fetchAndRenderMatchRecord(userId),
+            fetchAndCalculateAverageOpponentRating(userId)
+        ]);
         populateRatingTooltip(); // This doesn't depend on userId, but good to call for consistency
         await loadNextMatches(userId, userName); // Load first page of matches for the new user
-        await fetchAndCalculateAverageOpponentRating(userId);
     } else {
         console.error("User name not available for new profile, cannot render matches or calculate opponent rating accurately.");
         document.querySelector("#matches-container").innerHTML = '<p class="text-center text-red-500 mt-4">Could not load match history for this player.</p>';
     }
+
+    // Hide loading overlay and show the main app after all data is loaded (with minimum 3 seconds display)
+    setTimeout(() => {
+      if (loadingOverlay) loadingOverlay.style.display = 'none';
+      const app = document.getElementById('app');
+      if (app) app.style.display = 'flex';
+    }, 3000);
 }
 
 
@@ -944,6 +954,35 @@ document.addEventListener('DOMContentLoaded', async () => {
                     const visitingPlayerName = clickedCard.dataset.visitingPlayerName;
                     if (matchId) {
                         showGraphModal({Matchid: matchId, playerHome1Name: homePlayerName, playerVisiting1Name: visitingPlayerName});
+                    }
+                }
+            });
+
+            // Add scroll listener for infinite loading and back-to-top button
+            matchesContainer.addEventListener('scroll', async () => {
+                // Check if scrolled to bottom (with some tolerance)
+                const scrollTop = matchesContainer.scrollTop;
+                const scrollHeight = matchesContainer.scrollHeight;
+                const clientHeight = matchesContainer.clientHeight;
+                const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px tolerance
+
+                if (isAtBottom && hasMoreMatches && document.getElementById('loading-matches-indicator').style.display !== 'block') {
+                    const userName = await fetchAndRenderUserDetails(userId); // Re-fetch name to ensure it's current
+                    if (userName) {
+                        hasMoreMatches = await fetchAndAppendMatchesPage(userId, userName, currentPageForMatches, MATCH_PAGE_SIZE);
+                        currentPageForMatches++;
+                    }
+                }
+
+                // Show/hide back to top button
+                const backToTopBtn = document.getElementById('back-to-top-btn');
+                if (backToTopBtn) {
+                    if (scrollTop > 100) {
+                        backToTopBtn.classList.remove('hidden');
+                        backToTopBtn.classList.add('opacity-100');
+                    } else {
+                        backToTopBtn.classList.add('hidden');
+                        backToTopBtn.classList.remove('opacity-100');
                     }
                 }
             });
