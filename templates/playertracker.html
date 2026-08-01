@@ -1,4 +1,4 @@
- sln<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
 <head>
   <meta charset="UTF-8" />
@@ -9,17 +9,28 @@
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
 </head>
 <body class="bg-gray-100 antialiased text-gray-900">
-  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app">
-    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300 md:translate-x-0 -translate-x-full">
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ease-in-out" style="display: flex; opacity: 1; background: white;">
+    <div class="text-center">
+      <div class="mb-6">
+        <svg class="animate-spin h-10 w-10 text-indigo-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Loading Player Tracker</h2>
+      <p class="text-sm text-gray-400">Please wait a moment</p>
+    </div>
+  </div>
+  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app" style="display: none;">
+    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
         <div class="flex items-center space-x-2">
           <img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
           <span class="text-xl font-semibold sidebar-text">Squash Stats</span>
-          <span class="text-xl font-semibold sidebar-text">US Squash</span>
         </div>
         <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevrons-left"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
-          </svg>
         </button>
       </div>
       <nav class="flex-1 overflow-y-auto mt-4 px-2 text-sm font-medium space-y-6">
@@ -36,10 +47,10 @@
           <p class="text-gray-500 uppercase sidebar-text">Players</p>
           <ul class="mt-2 space-y-1">
             
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar" class="w-5 h-5"></i><span class="sidebar-text">Events <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Rankings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="columns-3" class="w-5 h-5"></i><span class="sidebar-text">Leagues <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="house" class="w-5 h-5"></i><span class="sidebar-text">Clubs <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar" class="w-5 h-5"></i><span class="sidebar-text">Events <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></a></li>
+                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Rankings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></a></li>
+                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="columns-3" class="w-5 h-5"></i><span class="sidebar-text">Leagues <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></a></li>
+                <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="house" class="w-5 h-5"></i><span class="sidebar-text">Clubs <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></a></li>
           </ul>
         </div>
 
@@ -47,16 +58,16 @@
           <p class="text-gray-500 uppercase sidebar-text">College Squash Association</p>
           <ul class="mt-2 space-y-1">
             <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams</span></a></li>
-            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></a></li>
           </ul>
         </div>
 
         <div>
           <p class="text-gray-500 uppercase sidebar-text">Other</p>
           <ul class="mt-2 space-y-1">
-            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="life-buoy" class="w-5 h-5"></i><span class="sidebar-text">Help <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Settings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="life-buoy" class="w-5 h-5"></i><span class="sidebar-text">Help <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Settings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></a></li>
           </ul>
         </div>
         <div>
@@ -76,26 +87,61 @@
           <h1 id="welcome-message" class="text-2xl font-semibold tracking-tight">Player Tracker</h1>
           <p class="text-sm text-gray-500">Search for a player to get their latest match details.</p>
         </div>
-        <div class="relative w-full md:w-80">
-          <input
-            type="text"
-            id="search-input"
-            placeholder="Search for a player..."
-            class="pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm w-full"
-          />
-          <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
-          </svg>
-          <div id="search-results" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden"></div>
+        <div class="relative w-full md:w-96">
+          <!-- Search Box with Relative Positioning for the Border Overlay -->
+          <div class="relative flex items-center bg-white border border-gray-300 rounded-2xl px-4 py-3 shadow-sm search-input-box transition-all duration-300">
+            <!-- Search Icon -->
+            <svg class="w-5 h-5 text-gray-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
+            </svg>
+            
+            <!-- Vertical Divider Line -->
+            <div class="h-5 w-[1px] bg-gray-200 mx-3 shrink-0"></div>
+      
+            <!-- Search Input Field -->
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Search for a player..."
+              class="w-full bg-transparent focus:outline-none text-sm text-gray-800 placeholder-gray-400"
+            />
+          </div>
+          
+          <div id="search-results" class="absolute z-10 w-full bg-white border border-gray-200 rounded-xl shadow-xl mt-2 max-h-60 overflow-y-auto hidden"></div>
         </div>
       </div>
+      
+      <style>
+        /* Hide default border on focus */
+        .search-input-box:focus-within {
+          border-color: transparent;
+        }
+      
+        /* Create a custom thicker gradient border using a pseudo-element */
+        .search-input-box:focus-within::after {
+          content: '';
+          position: absolute;
+          inset: -3px; /* <-- CHANGE THIS NUMBER TO MAKE THE LINE THICKER (-3px, -4px, etc.) */
+          border-radius: 19px; /* Match container rounding + thickness */
+          background: linear-gradient(270deg, #3b82f6, #6366f1, #ec4899, #3b82f6);
+          background-size: 300% 300%;
+          animation: moveGradient 4s ease infinite;
+          z-index: -1;
+          pointer-events: none;
+        }
+      
+        @keyframes moveGradient {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+      </style>
 
       <div id="lookup-result-container" class="max-w-2xl mx-auto mt-8">
         <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-8 shadow-xl text-center">
             <i data-lucide="search" class="w-12 h-12 mx-auto text-gray-400 mb-4"></i>
             <p class="text-gray-500">Search for a player above to see their latest match information and upcoming schedule.</p>
         </div>
-      </div>
     </main>
 
     <!-- Mobile bottom navigation -->

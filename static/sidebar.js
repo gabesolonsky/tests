@@ -15,12 +15,19 @@
   window.toggleSidebar = function(){
     createOverlay();
     const app = document.getElementById('app');
-    const open = app.classList.toggle('sidebar-open');
-    // lock body scroll while sidebar open
-    if(open) document.body.classList.add('no-scroll'); else document.body.classList.remove('no-scroll');
-    // update overlay visibility class handled by CSS
-    // update aria on toggle buttons
-    document.querySelectorAll('.toggle-btn').forEach(btn => btn.setAttribute('aria-expanded', String(open)));
+    const isCurrentlyCollapsed = app.classList.contains('sidebar-collapsed') || app.classList.contains('sidebar-open');
+    // On desktop: toggle sidebar-collapsed (for the collapsible sidebar feature)
+    // On mobile: toggle sidebar-open (for off-canvas sidebar)
+    if (window.innerWidth < 768) {
+      const open = app.classList.toggle('sidebar-open');
+      if(open) document.body.classList.add('no-scroll'); else document.body.classList.remove('no-scroll');
+      document.querySelectorAll('.toggle-btn').forEach(btn => btn.setAttribute('aria-expanded', String(open)));
+    } else {
+      app.classList.toggle('sidebar-collapsed');
+      // Ensure sidebar-open is not set on desktop
+      app.classList.remove('sidebar-open');
+      document.body.classList.remove('no-scroll');
+    }
   };
 
   function hideSidebar(){

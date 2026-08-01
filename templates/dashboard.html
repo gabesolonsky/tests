@@ -9,23 +9,48 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
+  <style>
+    /* Hide default border on focus */
+    .search-input-box:focus-within {
+      border-color: transparent;
+    }
+
+    /* Custom thicker gradient border pseudo-element */
+    .search-input-box:focus-within::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 19px;
+      background: linear-gradient(270deg, #3b82f6, #6366f1, #ec4899, #3b82f6);
+      background-size: 300% 300%;
+      animation: moveGradient 4s ease infinite;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    @keyframes moveGradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+  </style>
 </head>
 <body class="bg-gray-100 antialiased text-gray-900">
-  <!-- Loading Overlay -->
-  <div id="loading-overlay" class="fixed inset-0 bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900 z-50 flex items-center justify-center" style="display: flex;">
-    <div class="text-center">
-      <!-- Modern Multi-Layer Spinner -->
-      <div class="relative mb-8">
-        <div class="animate-spin rounded-full h-20 w-20 border-4 border-purple-300 border-t-purple-600 mx-auto"></div>
-        <div class="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-400 animate-spin mx-auto" style="animation-duration: 1.5s;"></div>
-        <div class="absolute inset-0 rounded-full border-4 border-transparent border-b-purple-500 animate-spin mx-auto" style="animation-duration: 2s;"></div>
-      </div>
 
-      <!-- Animated Text -->
-      <h2 class="text-2xl font-bold text-purple-100 mb-2 animate-pulse">Welcome to Squash Stats</h2>
-      <p class="text-purple-200 text-lg font-medium tracking-wide">Loading your dashboard...</p>
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ease-in-out" style="display: flex; opacity: 1; background: white;">
+    <div class="text-center">
+      <div class="mb-6">
+        <svg class="animate-spin h-10 w-10 text-indigo-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Loading Dashboard</h2>
+      <p class="text-sm text-gray-400">Please wait a moment</p>
     </div>
   </div>
+  
   <div class="flex h-screen overflow-hidden sidebar-expanded" id="app" style="display: none;">
     <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
@@ -35,8 +60,6 @@
         </div>
         <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevrons-left"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
         </button>
       </div>
       <nav class="flex-1 overflow-y-auto mt-4 px-2 text-sm font-medium space-y-6">
@@ -44,12 +67,10 @@
           <p class="text-gray-500 uppercase sidebar-text">Profile</p>
           <ul class="mt-2 space-y-1">
             <li><a href="/dashboard" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-purple-600"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="sidebar-text">Dashboard</span></a></li>
-            <!-- Updated Analytics link to pass userId -->
             <li><a href="/analytics" id="analytics-link" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="bar-chart" class="w-5 h-5"></i><span class="sidebar-text">Analytics</span></a></li>
             <li><a href="/playertracker" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="user-round-search" class="w-5 h-5"></i><span class="sidebar-text">Advanced Player Tracker</span></a></li>
           </ul>
         </div>
-
         <div>
           <p class="text-gray-500 uppercase sidebar-text">Players</p>
           <ul class="mt-2 space-y-1">
@@ -59,17 +80,14 @@
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="house" class="w-5 h-5"></i><span class="sidebar-text">Clubs <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
           </ul>
         </div>
-
         <div>
           <p class="text-gray-500 uppercase sidebar-text">College Squash Association</p>
           <ul class="mt-2 space-y-1">
-            <!-- Home removed per request -->
             <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams</span></a></li>
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
           </ul>
         </div>
-
         <div>
           <p class="text-gray-500 uppercase sidebar-text">Other</p>
           <ul class="mt-2 space-y-1">
@@ -77,7 +95,6 @@
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Settings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
           </ul>
         </div>
-                <!-- Contact Me section added here -->
         <div>
           <p class="text-gray-500 uppercase sidebar-text mt-6">Contact</p>
           <ul class="mt-2 space-y-1">
@@ -89,32 +106,34 @@
       </nav>
     </aside>
 
-    <!-- sidebar overlay (created by JS) -->
     <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
 
-    <main class="flex-1 overflow-y-auto p-4 md:p-6">
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 md:mb-6 gap-4">
         <div>
           <h1 id="welcome-message" class="text-xl md:text-2xl font-semibold tracking-tight">Welcome Back, Gabe 🎉</h1>
           <p class="text-sm text-gray-500">Your dashboard has been updated with the latest updates.</p>
         </div>
-        <div class="relative w-full md:w-auto">
-          <input
-            type="text"
-            id="search-input"
-            placeholder="Search..."
-            class="w-full md:w-auto pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm"
-          />
-          <svg
-            class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
-          </svg>
-          <div id="search-results" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden"></div>
+        <!-- Updated Identical Search Bar with Thicker Animated Gradient Border -->
+        <div class="relative w-full md:w-96">
+          <div class="relative flex items-center bg-white border border-gray-300 rounded-2xl px-4 py-3 shadow-sm search-input-box transition-all duration-300">
+            <!-- Search Icon -->
+            <svg class="w-5 h-5 text-gray-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
+            </svg>
+            
+            <!-- Vertical Divider Line -->
+            <div class="h-5 w-[1px] bg-gray-200 mx-3 shrink-0"></div>
+
+            <!-- Search Input Field -->
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Search..."
+              class="w-full bg-transparent focus:outline-none text-sm text-gray-800 placeholder-gray-400"
+            />
+          </div>
+          <div id="search-results" class="absolute z-10 w-full bg-white border border-gray-200 rounded-xl shadow-xl mt-2 max-h-60 overflow-y-auto hidden"></div>
         </div>
       </div>
 
@@ -129,26 +148,20 @@
             </div>
             <h2 id="current-rating" class="text-4xl md:text-5xl font-extrabold text-indigo-600 tracking-tight leading-tight mt-2">4.99</h2>
           </div>
-
           <div class="space-y-4 md:space-y-5 text-sm md:text-[15px] text-neutral-700 leading-relaxed">
             <div>
               <div class="flex items-center gap-1 mb-1 relative group">
                 <p class="text-sm text-neutral-500">Progress to Next Level</p>
                 <i data-lucide="help-circle" class="w-4 h-4 text-neutral-400 cursor-pointer"></i>
                 <div id="rating-tooltip" class="absolute top-full left-1/2 -translate-x-1/2 mt-2 p-3 bg-gray-800 text-white text-xs rounded-md shadow-lg z-20 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-200 w-max max-w-xs text-left">
-                  <div id="rating-tooltip-content">
-                    </div>
+                  <div id="rating-tooltip-content"></div>
                 </div>
               </div>
               <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  class="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full"
-                  style="width: 49%"
-                ></div>
+                <div class="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full" style="width: 49%"></div>
               </div>
               <p class="text-xs mt-2 text-neutral-400 italic">49% towards semi-pro</p>
             </div>
-
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
               <div>
                 <p class="text-sm font-medium text-neutral-800">Highest Rating</p>
@@ -170,7 +183,6 @@
                 <p id="average-opponent-rating" class="text-sm text-neutral-600">4.85</p>
               </div>
             </div>
-
             <div class="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
               <div class="flex items-center gap-2">
                 <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
@@ -244,7 +256,6 @@
         </div>
       </div>
 
-      <!-- Mobile bottom navigation -->
       <div id="mobile-nav" class="mobile-bottom-nav md:hidden" role="navigation" aria-label="Mobile navigation">
         <button class="mobile-nav-btn" data-target="/dashboard" aria-label="Dashboard"><i data-lucide="home"></i><span>Dashboard</span></button>
         <button class="mobile-nav-btn" data-target="/analytics" aria-label="Analytics"><i data-lucide="bar-chart-2"></i><span>Analytics</span></button>
@@ -254,51 +265,467 @@
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         <div class="col-span-1 lg:col-span-2 bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-4 md:p-6 shadow-xl font-sans flex flex-col">
-          <h2 class="text-base md:text-lg font-semibold mb-4 text-gray-800">Rating Over Time</h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base md:text-lg font-semibold text-gray-800">Rating Over Time</h2>
+            <button id="reset-zoom-btn" class="hidden inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm hover:bg-indigo-600 hover:text-white hover:border-indigo-600 hover:shadow-md active:scale-95 transition-all duration-150">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              <span>Reset Zoom</span>
+            </button>
+          </div>
           <div id="chart" class="flex-1 min-h-[200px] md:min-h-[300px]"></div>
         </div>
 
         <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-4 md:p-6 shadow-xl font-sans flex flex-col completed-matches-widget">
-            <h2 class="text-base md:text-lg font-semibold mb-2">Completed Matches</h2>
-              <div id="matches-container" class="space-y-3 overflow-y-auto pr-2 no-scrollbar"></div>
-              <div id="loading-matches-indicator" class="text-center py-2" style="display:none;">
-                  <svg class="animate-spin h-5 w-5 text-gray-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <p class="text-sm text-gray-500 mt-1">Loading more matches...</p>
+          <h2 class="text-base md:text-lg font-semibold mb-2">Completed Matches</h2>
+          <div id="matches-container" class="space-y-3 overflow-y-auto pr-2 no-scrollbar"></div>
+          <div id="loading-matches-indicator" class="text-center py-2" style="display:none;">
+            <svg class="animate-spin h-5 w-5 text-gray-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-sm text-gray-500 mt-1">Loading more matches...</p>
+          </div>
+          <button id="back-to-top-btn" class="fixed bottom-20 right-4 bg-indigo-600 text-white p-3 rounded-full shadow-lg opacity-0 transition-opacity duration-200 hidden" onclick="document.getElementById('matches-container').scrollTo({top: 0, behavior: 'smooth'});">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 15l-6-6-6 6"/>
+            </svg>
+          </button>
+          <p id="no-more-matches-message" class="text-center text-gray-500 mt-4" style="display:none;">No more matches to load.</p>
+        </div>
+      </div>
+
+      <div class="mt-4 md:mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <!-- Test Record Widget - Dynamic Ring Chart (powered by record API) -->
+        <style>
+          .ring-chart-text-title { font-size: 13px; font-weight: 700; fill: #1f2937; }
+          .ring-chart-text-subtitle { font-size: 7px; fill: #6b7280; }
+          .ring-chart-text-legend { font-size: 11px; fill: #4b5563; }
+          .ring-group { transition: transform 0.4s cubic-bezier(.34, 1.56, .64, 1), opacity 0.3s ease; transform-box: fill-box; transform-origin: 50% 50%; }
+          .ring-group:hover:not(.popped) { transform: scale(1.06); }
+          .ring-group.popped { transform: scale(1.16); }
+          .ring-group.popped circle:not([id]) { stroke: #9ca3af; transition: stroke 0.3s ease; }
+          .ring-group.dimmed { opacity: 0.35; }
+          .ring-chart-container svg { overflow: visible; }
+          .record-match-panel { min-height: 74px; }
+          .record-empty-state {
+            min-height: 172px;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s ease;
+          }
+          .record-breakdown-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            font-size: 12px;
+            transition: all 0.2s ease;
+          }
+          .ring-legend-group { transition: opacity 0.2s ease; }
+          .ring-legend-group:hover { opacity: 0.7; }
+        </style>
+
+        <!-- Singles record card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-3 md:p-4 shadow-xl font-sans">
+          <h2 class="text-sm md:text-base font-semibold mb-2 text-gray-800">Singles Match Record</h2>
+
+          <div id="record-singles-chart-wrapper">
+            <div class="ring-chart-container">
+              <svg width="100%" viewBox="0 0 360 212" role="img" aria-label="Singles wins by match length">
+                <title>Singles wins by match length</title>
+                <desc>Three concentric rings showing singles wins broken down by 3-game, 4-game, and 5-game matches</desc>
+
+                <g id="record-singles-ring-three" class="ring-group" style="cursor:pointer">
+                  <circle cx="95" cy="108" r="76" fill="none" stroke="#e5e7eb" stroke-width="13"/>
+                  <circle id="record-singles-ring-three-fill" cx="95" cy="108" r="76" fill="none" stroke="#4f46e5" stroke-width="13" stroke-linecap="round" stroke-dasharray="477.5 477.5" stroke-dashoffset="0" transform="rotate(-90 95 108)"/>
+                </g>
+
+                <g id="record-singles-ring-four" class="ring-group" style="cursor:pointer">
+                  <circle cx="95" cy="108" r="52" fill="none" stroke="#e5e7eb" stroke-width="13"/>
+                  <circle id="record-singles-ring-four-fill" cx="95" cy="108" r="52" fill="none" stroke="#7c3aed" stroke-width="13" stroke-linecap="round" stroke-dasharray="326.7 326.7" stroke-dashoffset="326.7" transform="rotate(-90 95 108)"/>
+                </g>
+
+                <g id="record-singles-ring-five" class="ring-group" style="cursor:pointer">
+                  <circle cx="95" cy="108" r="30" fill="none" stroke="#e5e7eb" stroke-width="13"/>
+                  <circle id="record-singles-ring-five-fill" cx="95" cy="108" r="30" fill="none" stroke="#14b8a6" stroke-width="13" stroke-linecap="round" stroke-dasharray="188.5 188.5" stroke-dashoffset="188.5" transform="rotate(-90 95 108)"/>
+                </g>
+
+                <text id="record-singles-total-wins-text" x="95" y="104" text-anchor="middle" class="ring-chart-text-title">0</text>
+                <text x="95" y="117" text-anchor="middle" class="ring-chart-text-subtitle">matches</text>
+
+                <g id="record-singles-legend-three" class="ring-legend-group" style="cursor:pointer">
+                  <rect x="210" y="73" width="10" height="10" rx="2" fill="#4f46e5"/>
+                  <text id="record-singles-legend-three-text" x="228" y="82" class="ring-chart-text-legend">3-game — 0</text>
+                </g>
+                <g id="record-singles-legend-four" class="ring-legend-group" style="cursor:pointer">
+                  <rect x="210" y="99" width="10" height="10" rx="2" fill="#7c3aed"/>
+                  <text id="record-singles-legend-four-text" x="228" y="108" class="ring-chart-text-legend">4-game — 0</text>
+                </g>
+                <g id="record-singles-legend-five" class="ring-legend-group" style="cursor:pointer">
+                  <rect x="210" y="125" width="10" height="10" rx="2" fill="#14b8a6"/>
+                  <text id="record-singles-legend-five-text" x="228" y="134" class="ring-chart-text-legend">5-game — 0</text>
+                </g>
+              </svg>
+            </div>
+
+            <div id="record-singles-match-panel" class="record-match-panel" style="margin-top: 0.85rem;">
+              <p id="record-singles-panel-empty" style="color: #6b7280; font-size: 12px;">Tap a ring above to see the breakdown for that match type.</p>
+              <div id="record-singles-panel-title" style="display:none; align-items:center; gap:8px; margin-bottom: 8px;">
+                <span id="record-singles-panel-dot" style="width:8px;height:8px;border-radius:2px;display:inline-block;"></span>
+                <p id="record-singles-panel-heading" style="font-weight:500; font-size:13px; margin:0;"></p>
               </div>
-              <button id="back-to-top-btn" class="fixed bottom-20 right-4 bg-indigo-600 text-white p-3 rounded-full shadow-lg opacity-0 transition-opacity duration-200 hidden" onclick="document.getElementById('matches-container').scrollTo({top: 0, behavior: 'smooth'});">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M18 15l-6-6-6 6"/>
-                </svg>
-              </button>
-              <p id="no-more-matches-message" class="text-center text-gray-500 mt-4" style="display:none;">No more matches to load.</p>
+              <div id="record-singles-match-list"></div>
+            </div>
+          </div>
+
+          <div id="record-singles-empty-state" class="record-empty-state hidden flex-col items-center justify-center text-center py-8 px-4 rounded-xl">
+            <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+            </div>
+            <p class="text-sm font-medium text-gray-600">No singles matches yet</p>
+            <p class="text-xs text-gray-400 mt-1">Results will appear here once matches are recorded.</p>
+          </div>
+        </div>
+
+        <!-- Doubles record card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-3 md:p-4 shadow-xl font-sans">
+          <h2 class="text-sm md:text-base font-semibold mb-2 text-gray-800">Doubles Match Record</h2>
+
+          <div id="record-doubles-chart-wrapper">
+            <div class="ring-chart-container">
+              <svg width="100%" viewBox="0 0 360 212" role="img" aria-label="Doubles wins by match length">
+                <title>Doubles wins by match length</title>
+                <desc>Three concentric rings showing doubles wins broken down by 3-game, 4-game, and 5-game matches</desc>
+
+                <g id="record-doubles-ring-three" class="ring-group" style="cursor:pointer">
+                  <circle cx="95" cy="108" r="76" fill="none" stroke="#e5e7eb" stroke-width="13"/>
+                  <circle id="record-doubles-ring-three-fill" cx="95" cy="108" r="76" fill="none" stroke="#4f46e5" stroke-width="13" stroke-linecap="round" stroke-dasharray="477.5 477.5" stroke-dashoffset="0" transform="rotate(-90 95 108)"/>
+                </g>
+
+                <g id="record-doubles-ring-four" class="ring-group" style="cursor:pointer">
+                  <circle cx="95" cy="108" r="52" fill="none" stroke="#e5e7eb" stroke-width="13"/>
+                  <circle id="record-doubles-ring-four-fill" cx="95" cy="108" r="52" fill="none" stroke="#7c3aed" stroke-width="13" stroke-linecap="round" stroke-dasharray="326.7 326.7" stroke-dashoffset="326.7" transform="rotate(-90 95 108)"/>
+                </g>
+
+                <g id="record-doubles-ring-five" class="ring-group" style="cursor:pointer">
+                  <circle cx="95" cy="108" r="30" fill="none" stroke="#e5e7eb" stroke-width="13"/>
+                  <circle id="record-doubles-ring-five-fill" cx="95" cy="108" r="30" fill="none" stroke="#14b8a6" stroke-width="13" stroke-linecap="round" stroke-dasharray="188.5 188.5" stroke-dashoffset="188.5" transform="rotate(-90 95 108)"/>
+                </g>
+
+                <text id="record-doubles-total-wins-text" x="95" y="104" text-anchor="middle" class="ring-chart-text-title">0</text>
+                <text x="95" y="117" text-anchor="middle" class="ring-chart-text-subtitle">matches</text>
+
+                <g id="record-doubles-legend-three" class="ring-legend-group" style="cursor:pointer">
+                  <rect x="210" y="73" width="10" height="10" rx="2" fill="#4f46e5"/>
+                  <text id="record-doubles-legend-three-text" x="228" y="82" class="ring-chart-text-legend">3-game — 0</text>
+                </g>
+                <g id="record-doubles-legend-four" class="ring-legend-group" style="cursor:pointer">
+                  <rect x="210" y="99" width="10" height="10" rx="2" fill="#7c3aed"/>
+                  <text id="record-doubles-legend-four-text" x="228" y="108" class="ring-chart-text-legend">4-game — 0</text>
+                </g>
+                <g id="record-doubles-legend-five" class="ring-legend-group" style="cursor:pointer">
+                  <rect x="210" y="125" width="10" height="10" rx="2" fill="#14b8a6"/>
+                  <text id="record-doubles-legend-five-text" x="228" y="134" class="ring-chart-text-legend">5-game — 0</text>
+                </g>
+              </svg>
+            </div>
+
+            <div id="record-doubles-match-panel" class="record-match-panel" style="margin-top: 0.85rem;">
+              <p id="record-doubles-panel-empty" style="color: #6b7280; font-size: 12px;">Tap a ring above to see the breakdown for that match type.</p>
+              <div id="record-doubles-panel-title" style="display:none; align-items:center; gap:8px; margin-bottom: 8px;">
+                <span id="record-doubles-panel-dot" style="width:8px;height:8px;border-radius:2px;display:inline-block;"></span>
+                <p id="record-doubles-panel-heading" style="font-weight:500; font-size:13px; margin:0;"></p>
+              </div>
+              <div id="record-doubles-match-list"></div>
+            </div>
+          </div>
+
+          <div id="record-doubles-empty-state" class="record-empty-state hidden flex-col items-center justify-center text-center py-8 px-4 rounded-xl">
+            <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
+            </div>
+            <p class="text-sm font-medium text-gray-600">No doubles matches yet</p>
+            <p class="text-xs text-gray-400 mt-1">Results will appear here once matches are recorded.</p>
           </div>
         </div>
       </div>
     </main>
   </div>
 
-<div id="graph-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
+  <div id="graph-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
     <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
-        <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
-            <h3 class="text-xl font-semibold text-gray-800">Match Insights</h3>
-            <button id="graph-close" class="text-gray-500 hover:text-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-            </button>
+      <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
+        <h3 class="text-xl font-semibold text-gray-800">Match Insights</h3>
+        <button id="graph-close" class="text-gray-500 hover:text-gray-700">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="p-6">
+        <p id="graph-status" class="text-center text-gray-500 mb-4"></p>
+        <div id="metrics-container" class="min-h-[200px] flex flex-col">
+          <div class="text-center text-gray-400 py-10">Loading match data...</div>
         </div>
-
-        <div class="p-6">
-            <p id="graph-status" class="text-center text-gray-500 mb-4"></p>
-            <div id="metrics-container" class="min-h-[200px] flex flex-col">
-                <div class="text-center text-gray-400 py-10">Loading match data...</div>
-            </div>
-        </div>
+      </div>
     </div>
-</div>
+  </div>
 
-<script src="{{ url_for('static', filename='script.js') }}"></script>
-<script src="{{ url_for('static', filename='mobile-nav.js') }}"></script>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <script src="{{ url_for('static', filename='mobile-nav.js') }}"></script>
+  <script>
+  (function() {
+    'use strict';
+
+    // Use the global userId from script.js (default 170053)
+    const getUserId = () => typeof userId !== 'undefined' ? userId : 170053;
+
+    // Ring circumferences (2 * PI * r, matching the SVG geometry)
+    const CIRCUMFERENCES = {
+      three: 477.5,  // r=76
+      four: 326.7,   // r=52
+      five: 188.5    // r=30
+    };
+
+    const CATEGORY_META = {
+      three: { label: '3-Game Match Wins (won 3–0)', color: '#4f46e5', key: 3 },
+      four: { label: '4-Game Match Wins (won 3–1)', color: '#7c3aed', key: 4 },
+      five: { label: '5-Game Match Wins (won 3–2)', color: '#14b8a6', key: 5 }
+    };
+
+    // One state object per widget ("singles" / "doubles")
+    const widgets = {
+      singles: { filterType: 'S', data: null, selection: null },
+      doubles: { filterType: 'D', data: null, selection: null }
+    };
+
+    function el(prefix, suffix) {
+      return document.getElementById(`record-${prefix}-${suffix}`);
+    }
+
+    function resetPanel(prefix) {
+      const emptyEl = el(prefix, 'panel-empty');
+      const titleEl = el(prefix, 'panel-title');
+      const listEl = el(prefix, 'match-list');
+      if (emptyEl) emptyEl.style.display = 'block';
+      if (titleEl) titleEl.style.display = 'none';
+      if (listEl) listEl.innerHTML = '';
+    }
+
+    function resetRings(prefix) {
+      ['three', 'four', 'five'].forEach(k => {
+        const group = el(prefix, 'ring-' + k);
+        if (group) {
+          group.classList.remove('popped');
+          group.classList.remove('dimmed');
+        }
+      });
+    }
+
+    function selectCategory(prefix, key) {
+      const state = widgets[prefix];
+      if (!state) return;
+
+      if (state.selection === key) {
+        state.selection = null;
+        resetRings(prefix);
+        resetPanel(prefix);
+        return;
+      }
+
+      state.selection = key;
+      const cat = CATEGORY_META[key];
+      if (!cat || !state.data) return;
+
+      const entry = state.data.find(e => e.matchesType === cat.key);
+      const wins = entry ? entry.matchesWon : 0;
+      const losses = entry ? entry.matchesLost : 0;
+
+      const emptyEl = el(prefix, 'panel-empty');
+      const titleEl = el(prefix, 'panel-title');
+      const dotEl = el(prefix, 'panel-dot');
+      const headingEl = el(prefix, 'panel-heading');
+      const listEl = el(prefix, 'match-list');
+
+      if (emptyEl) emptyEl.style.display = 'none';
+      if (titleEl) titleEl.style.display = 'flex';
+      if (dotEl) dotEl.style.background = cat.color;
+      if (headingEl) headingEl.textContent = cat.label;
+
+      if (listEl) {
+        listEl.innerHTML = '';
+        const row = document.createElement('div');
+        row.className = 'record-breakdown-row';
+        row.style.borderLeft = `4px solid ${cat.color}`;
+        row.innerHTML = `
+          <div>
+            <span style="font-weight:500;">Wins</span>
+            <span style="color:#22c55e; margin-left:6px; font-weight:600;">${wins}</span>
+          </div>
+          <div>
+            <span style="font-weight:500;">Losses</span>
+            <span style="color:#ef4444; margin-left:6px; font-weight:600;">${losses}</span>
+          </div>
+          <div style="color:#6b7280; font-size:11px;">
+            Win Rate: ${(wins + losses) > 0 ? ((wins / (wins + losses)) * 100).toFixed(0) + '%' : 'N/A'}
+          </div>
+        `;
+        listEl.appendChild(row);
+      }
+
+      ['three', 'four', 'five'].forEach(k => {
+        const group = el(prefix, 'ring-' + k);
+        if (group) {
+          if (k === key) {
+            group.classList.add('popped');
+            group.classList.remove('dimmed');
+          } else {
+            group.classList.remove('popped');
+            group.classList.add('dimmed');
+          }
+        }
+      });
+    }
+
+    function showEmptyState(prefix, show) {
+      const wrapperEl = el(prefix, 'chart-wrapper');
+      const emptyEl = el(prefix, 'empty-state');
+      if (!wrapperEl || !emptyEl) return;
+      if (show) {
+        wrapperEl.classList.add('hidden');
+        emptyEl.classList.remove('hidden');
+        emptyEl.classList.add('flex');
+      } else {
+        wrapperEl.classList.remove('hidden');
+        emptyEl.classList.add('hidden');
+        emptyEl.classList.remove('flex');
+      }
+    }
+
+    function populateWidget(prefix, allData) {
+      const state = widgets[prefix];
+      const typeData = allData.filter(d => d.type === state.filterType);
+      state.data = typeData;
+
+      const w3 = typeData.find(d => d.matchesType === 3);
+      const w4 = typeData.find(d => d.matchesType === 4);
+      const w5 = typeData.find(d => d.matchesType === 5);
+
+      const wins3 = w3 ? w3.matchesWon : 0;
+      const wins4 = w4 ? w4.matchesWon : 0;
+      const wins5 = w5 ? w5.matchesWon : 0;
+      const totalWins = wins3 + wins4 + wins5;
+
+      const losses3 = w3 ? w3.matchesLost : 0;
+      const losses4 = w4 ? w4.matchesLost : 0;
+      const losses5 = w5 ? w5.matchesLost : 0;
+      const totalLosses = losses3 + losses4 + losses5;
+
+      // Nothing recorded at all for this match type -> show the clean empty state
+      if (totalWins + totalLosses === 0) {
+        showEmptyState(prefix, true);
+        state.selection = null;
+        resetRings(prefix);
+        resetPanel(prefix);
+        return;
+      }
+      showEmptyState(prefix, false);
+
+      const totalMatches = totalWins + totalLosses;
+      const totalText = el(prefix, 'total-wins-text');
+      if (totalText) totalText.textContent = totalMatches;
+
+      const matches3 = wins3 + losses3;
+      const matches4 = wins4 + losses4;
+      const matches5 = wins5 + losses5;
+      const legend3Text = el(prefix, 'legend-three-text');
+      const legend4Text = el(prefix, 'legend-four-text');
+      const legend5Text = el(prefix, 'legend-five-text');
+      if (legend3Text) legend3Text.textContent = `3-game — ${matches3}`;
+      if (legend4Text) legend4Text.textContent = `4-game — ${matches4}`;
+      if (legend5Text) legend5Text.textContent = `5-game — ${matches5}`;
+
+      const calcOffset = (wins, circumference) => {
+        if (totalWins === 0) return circumference;
+        const proportion = wins / totalWins;
+        return circumference * (1 - proportion);
+      };
+
+      const ring3Fill = el(prefix, 'ring-three-fill');
+      const ring4Fill = el(prefix, 'ring-four-fill');
+      const ring5Fill = el(prefix, 'ring-five-fill');
+
+      if (ring3Fill) ring3Fill.setAttribute('stroke-dashoffset', calcOffset(wins3, CIRCUMFERENCES.three));
+      if (ring4Fill) ring4Fill.setAttribute('stroke-dashoffset', calcOffset(wins4, CIRCUMFERENCES.four));
+      if (ring5Fill) ring5Fill.setAttribute('stroke-dashoffset', calcOffset(wins5, CIRCUMFERENCES.five));
+
+      state.selection = null;
+      resetRings(prefix);
+      resetPanel(prefix);
+    }
+
+    function showErrorState(prefix) {
+      const totalText = el(prefix, 'total-wins-text');
+      if (totalText) totalText.textContent = '—';
+      showEmptyState(prefix, false);
+      const listEl = el(prefix, 'match-list');
+      const emptyEl = el(prefix, 'panel-empty');
+      if (emptyEl) emptyEl.style.display = 'none';
+      if (listEl) listEl.innerHTML = '<p style="color:#ef4444; font-size:12px;">Could not load record data.</p>';
+    }
+
+    async function fetchAndRenderRecord() {
+      const uid = getUserId();
+      try {
+        const res = await fetch(`/proxy/user/${uid}/record`);
+        if (!res.ok) throw new Error('HTTP error ' + res.status);
+        const data = await res.json();
+        populateWidget('singles', data);
+        populateWidget('doubles', data);
+      } catch (err) {
+        console.error('Match Record Widget: Error fetching record data:', err);
+        showErrorState('singles');
+        showErrorState('doubles');
+      }
+    }
+
+    function setupHandlers() {
+      ['singles', 'doubles'].forEach(prefix => {
+        ['three', 'four', 'five'].forEach(k => {
+          const ring = el(prefix, 'ring-' + k);
+          const legend = el(prefix, 'legend-' + k);
+          if (ring) ring.addEventListener('click', () => selectCategory(prefix, k));
+          if (legend) legend.addEventListener('click', () => selectCategory(prefix, k));
+        });
+      });
+    }
+
+    // Initialize
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        setupHandlers();
+        fetchAndRenderRecord();
+      });
+    } else {
+      setupHandlers();
+      fetchAndRenderRecord();
+    }
+
+    // Expose a refresh function globally so script.js can call it after profile switch
+    window.refreshMatchRecordWidgets = fetchAndRenderRecord;
+
+    // Watch for userId changes - poll every 2 seconds (lightweight)
+    let lastUserId = getUserId();
+    setInterval(() => {
+      const currentUserId = getUserId();
+      if (currentUserId !== lastUserId) {
+        lastUserId = currentUserId;
+        fetchAndRenderRecord();
+      }
+    }, 2000);
+
+  })();
+  </script>
 </body>
 </html>

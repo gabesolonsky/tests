@@ -1,15 +1,20 @@
 document.addEventListener("DOMContentLoaded", () => {
+    // Fade out loading overlay
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+        }, 300);
+    }
+    const app = document.getElementById('app');
+    if (app) app.style.display = 'flex';
+
     const searchInput = document.getElementById('search-input');
     const searchResultsContainer = document.getElementById('search-results');
     const lookupResultContainer = document.getElementById('lookup-result-container');
     let searchTimeout = null;
-
-    /**
-     * Toggles the sidebar visibility.
-     */
-    window.toggleSidebar = function() {
-        document.getElementById("app").classList.toggle("sidebar-expanded");
-    };
+    // Sidebar toggle is handled by sidebar.js
 
     /**
      * Creates the HTML for a single player card. The remove button and name link are now optional.
@@ -110,7 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (!added) throw new Error('Could not add player to tracker. They might already be tracked in another session.');
 
             // Step 2: Fetch the tracker list to get detailed info
-            const response = await fetch('/proxy/player_tracker/list');
+            const response = await fetch('/proxy/player_tracker/list?userId=170053');
             if (!response.ok) throw new Error('Could not fetch tracker data.');
             const trackerData = await response.json();
             
@@ -148,26 +153,37 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
+    /**
+         * Displays the search results in the dropdown.
+         * @param {Array} results - The array of search result objects.
+         */
     function displaySearchResults(results) {
+        const searchResultsContainer = document.getElementById('search-results');
         searchResultsContainer.innerHTML = '';
         const players = results.filter(r => r.ObjectType === 'Player');
         if (players.length === 0) {
-            searchResultsContainer.innerHTML = '<div class="p-2 text-gray-500">No players found.</div>';
+            searchResultsContainer.innerHTML = '<div class="p-2 text-gray-500">No results found.</div>';
             return;
         }
-        players.forEach(player => {
+        players.forEach(result => {
             const resultItem = document.createElement('div');
-            resultItem.className = 'flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200';
-            const imageUrl = player.LogoImageUrl || 'https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png';
-            resultItem.innerHTML = `<img src="${imageUrl}" alt="${player.ObjectName}" class="w-8 h-8 rounded-full object-cover"><div><p class="text-sm font-medium">${player.ObjectName}</p></div>`;
+            resultItem.className = 'flex items-center gap-2 p-2 hover:bg-gray-100 cursor-pointer border-b';
+            const imageUrl = result.LogoImageUrl || 'https://ussquash.org/wp-content/uploads%2Fussq-profile-icon-default.png';
+            resultItem.innerHTML = `<img src="${imageUrl}" alt="${result.ObjectName}" class="w-8 h-8 rounded-full object-cover"><div><p class="text-sm font-medium">${result.ObjectName}</p><p class="text-xs text-gray-500">${result.ObjectLocation ? `(${result.ObjectLocation})` : ''}</p></div>`;
             resultItem.addEventListener('click', () => {
-                performPlayerLookup(player); // Trigger the main lookup workflow
+                performPlayerLookup(result); // Keeps the tracker's lookup and cleanup workflow
                 searchInput.value = '';
                 searchResultsContainer.classList.add('hidden');
             });
             searchResultsContainer.appendChild(resultItem);
         });
     }
+
+
+
+    
+
+    
 
     // --- Event Listeners ---
     if (searchInput) {

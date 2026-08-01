@@ -27,23 +27,48 @@
     .event-card.lose { border-left: 4px solid #ef4444; }
     .event-logo { width: 40px; height: 40px; border-radius: 9999px; object-fit: cover; margin-right: 0.75rem; }
     .event-details p { margin: 0; line-height: 1.4; }
+    /* Hide default border on focus */
+    .search-input-box:focus-within {
+      border-color: transparent;
+    }
+
+    /* Custom thicker gradient border pseudo-element */
+    .search-input-box:focus-within::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 19px;
+      background: linear-gradient(270deg, #3b82f6, #6366f1, #ec4899, #3b82f6);
+      background-size: 300% 300%;
+      animation: moveGradient 4s ease infinite;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    @keyframes moveGradient {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
   </style>
 </head>
 <body class="bg-gray-100 antialiased text-gray-900">
-  <!-- Password Modal -->
-  <div id="password-modal" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50" style="display: none;">
-      <div class="bg-white p-8 rounded-lg shadow-xl text-center w-full max-w-sm mx-4">
-          <h2 class="text-2xl font-bold mb-4">Access Required</h2>
-          <p class="text-gray-600 mb-6">Please enter the password to view analytics.</p>
-          <input type="password" id="password-input" class="border border-gray-300 rounded-md p-2 text-center text-lg w-full focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter password">
-          <button id="password-submit-btn" class="mt-4 w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Enter</button>
-          <p id="password-error-message" class="text-red-500 text-sm mt-2 hidden">Incorrect password. Please try again.</p>
-          <p class="text-gray-500 text-sm mt-4">Contact Us: <a href="tel:301-347-8710" class="text-indigo-500 hover:underline">301-347-8710</a></p>
+  <!-- Loading Overlay -->
+  <div id="loading-overlay" class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ease-in-out" style="display: flex; opacity: 1; background: white;">
+    <div class="text-center">
+      <div class="mb-6">
+        <svg class="animate-spin h-10 w-10 text-indigo-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
       </div>
+      <h2 class="text-xl font-semibold text-gray-800 mb-1">Loading Analytics</h2>
+      <p class="text-sm text-gray-400">Please wait a moment</p>
+    </div>
   </div>
-
-  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app">
-    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300 md:translate-x-0 -translate-x-full">
+  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app" style="display: none;">
+    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
         <div class="flex items-center space-x-2">
           <img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
@@ -51,7 +76,6 @@
         </div>
         <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevrons-left"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
-          </svg>
         </button>
       </div>
       <nav class="flex-1 overflow-y-auto mt-4 px-2 text-sm font-medium space-y-6">
@@ -77,7 +101,6 @@
         <div>
           <p class="text-gray-500 uppercase sidebar-text">College Squash Association</p>
           <ul class="mt-2 space-y-1">
-            <!-- Home removed per request -->
             <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams</span></a></li>
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
@@ -105,29 +128,32 @@
     <!-- sidebar overlay (created by JS) -->
     <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
 
-    <main class="flex-1 overflow-y-auto p-4 md:p-6">
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-28 md:pb-6">
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h1 id="welcome-message" class="text-2xl font-semibold tracking-tight">Welcome Back... 🎉</h1>
           <p class="text-sm text-gray-500">Your analytics have been updated with the latest updates.</p>
         </div>
-        <div class="relative">
-          <input
-            type="text"
-            id="search-input"
-            placeholder="Search..."
-            class="pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm shadow-sm w-full"
-          />
-          <svg
-            class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
-          </svg>
-          <div id="search-results" class="absolute z-10 w-full bg-white border border-gray-300 rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto hidden"></div>
+        <!-- Updated Identical Search Bar with Thicker Animated Gradient Border -->
+        <div class="relative w-full md:w-96">
+          <div class="relative flex items-center bg-white border border-gray-300 rounded-2xl px-4 py-3 shadow-sm search-input-box transition-all duration-300">
+            <!-- Search Icon -->
+            <svg class="w-5 h-5 text-gray-400 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z" />
+            </svg>
+            
+            <!-- Vertical Divider Line -->
+            <div class="h-5 w-[1px] bg-gray-200 mx-3 shrink-0"></div>
+
+            <!-- Search Input Field -->
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Search..."
+              class="w-full bg-transparent focus:outline-none text-sm text-gray-800 placeholder-gray-400"
+            />
+          </div>
+          <div id="search-results" class="absolute z-10 w-full bg-white border border-gray-200 rounded-xl shadow-xl mt-2 max-h-60 overflow-y-auto hidden"></div>
         </div>
       </div>
 
@@ -156,11 +182,12 @@
               </div>
               <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div
+                  id="rank-progress-bar"
                   class="h-full bg-gradient-to-r from-indigo-400 to-indigo-600 rounded-full"
-                  style="width: 49%"
+                  style="width: 0%"
                 ></div>
               </div>
-              <p class="text-xs mt-2 text-neutral-400 italic">49% towards semi-pro</p>
+              <p id="rank-progress-text" class="text-xs mt-2 text-neutral-400 italic">Calculating...</p>
             </div>
 
             <div class="grid grid-cols-2 gap-y-4 gap-x-5">
@@ -281,41 +308,69 @@
         </div>
 
         <!-- Advanced Match Insights -->
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
-          <h2 class="text-xl font-semibold mb-4 text-gray-800">Advanced Match Insights</h2>
-          <div class="space-y-1">
-            <h4 class="font-semibold text-gray-700 mb-2">Match Overview</h4>
-            
-            <!-- Clickable Longest/Shortest Match Containers -->
-            <div id="average-match-container" class="flex justify-between p-2 rounded-lg">
-              <span>Average Match Length</span>
-              <span id="average-match-length" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">N/A</span>
-            </div>
-            <div id="longest-match-container" class="flex justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer">
-              <span>Longest Match</span>
-              <span id="longest-match-length" class="px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">N/A</span>
-            </div>
-            <div id="shortest-match-container" class="flex justify-between p-2 rounded-lg hover:bg-gray-100 cursor-pointer">
-              <span>Shortest Match</span>
-              <span id="shortest-match-length" class="px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">N/A</span>
+        <div class="relative bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
+          
+          <!-- Centered Maintenance Notice -->
+          <div class="flex justify-center mb-4">
+            <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium text-center">
+              <span>🚧</span>
+              <span>Feature currently down — fix in progress</span>
             </div>
           </div>
-          <hr class="my-3 border-gray-200" />
-          <div class="space-y-1">
-            <h4 class="font-semibold text-gray-700 mb-2">Point Overview</h4>
-            <!-- Point stats remain non-interactive -->
-            <div class="flex justify-between p-2">
-              <span>Average Point</span>
-              <span id="average-point-length" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">N/A</span>
+
+          <!-- Greyed out (Opacity reduced to 30%) & Unclickable Wrapper -->
+          <div class="opacity-30 pointer-events-none select-none">
+            <h2 class="text-xl font-semibold mb-4 text-gray-800">Advanced Match Insights</h2>
+            <div class="space-y-1">
+              <h4 class="font-semibold text-gray-700 mb-2">Match Overview</h4>
+              
+              <!-- Longest/Shortest Match Containers -->
+              <div id="average-match-container" class="flex justify-between p-2 rounded-lg">
+                <span>Average Match Length</span>
+                <span id="average-match-length" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">N/A</span>
+              </div>
+              <div id="longest-match-container" class="flex justify-between p-2 rounded-lg">
+                <span>Longest Match</span>
+                <span id="longest-match-length" class="px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">N/A</span>
+              </div>
+              <div id="shortest-match-container" class="flex justify-between p-2 rounded-lg">
+                <span>Shortest Match</span>
+                <span id="shortest-match-length" class="px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 text-xs font-semibold">N/A</span>
+              </div>
             </div>
-            <div class="flex justify-between p-2">
-              <span>Longest Point</span>
-              <span id="longest-point-length" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">N/A</span>
+            <hr class="my-3 border-gray-200" />
+            <div class="space-y-1">
+              <h4 class="font-semibold text-gray-700 mb-2">Point Overview</h4>
+              <!-- Point stats remain non-interactive -->
+              <div class="flex justify-between p-2">
+                <span>Average Point</span>
+                <span id="average-point-length" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">N/A</span>
+              </div>
+              <div class="flex justify-between p-2">
+                <span>Longest Point</span>
+                <span id="longest-point-length" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">N/A</span>
+              </div>
+              <div class="flex justify-between p-2">
+                <span>Shortest Point</span>
+                <span id="shortest-point-length" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">N/A</span>
+              </div>
             </div>
-            <div class="flex justify-between p-2">
-              <span>Shortest Point</span>
-              <span id="shortest-point-length" class="px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs font-semibold">N/A</span>
-            </div>
+          </div>
+        </div>  
+
+        <!-- Streaks Card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
+          <h2 class="text-xl font-semibold mb-4 text-gray-800">Streaks</h2>
+          <div id="streaks-container" class="space-y-2">
+            <p class="text-center text-gray-500 mt-10">Loading data...</p>
+          </div>
+        </div>
+
+        <!-- Comeback Tracker Card -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
+          <h2 class="text-xl font-semibold mb-4 text-gray-800">Comeback Tracker</h2>
+          <div id="comeback-tracker-container" class="space-y-2">
+            <p class="text-center text-gray-500 mt-10">Loading data...</p>
           </div>
         </div>
       </div>
@@ -331,18 +386,45 @@
   </div>
 
   <!-- Match Insights Modal -->
-    <div id="graph-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-        <div class="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+    <div id="graph-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-[60] p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
             <div class="flex justify-between items-center p-4 border-b">
                 <h2 id="match-insights-title" class="text-xl font-bold">Match Insights</h2>
-                <button id="graph-close" class="text-gray-500 hover:text-gray-800">&times;</button>
+                <button id="graph-close" class="p-2 text-neutral-400 hover:text-gray-800 transition-colors rounded-lg focus:outline-none" aria-label="Close">
+                  <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
             </div>
             <div id="graph-status" class="p-4 text-center"></div>
-            <div id="metrics-container" class="overflow-y-auto p-4">
+            <div id="metrics-container" class="overflow-y-auto p-4 pb-20 md:pb-6">
                 <!-- Graph and metrics will be loaded here -->
             </div>
         </div>
     </div>
+
+  <!-- Generic Match List Modal (used for monthly matches + comeback wins) -->
+  <div id="match-list-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <!-- Added max-h-[calc(100vh-2rem)] and overflow-hidden to keep the modal inside the viewport -->
+    <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[60vh] flex flex-col overflow-hidden">
+        
+        <!-- Header stays fixed at the top -->
+        <div class="flex justify-between items-center p-4 border-b shrink-0">
+            <h2 id="match-list-title" class="text-xl font-bold">Matches</h2>
+            <button id="match-list-close" class="p-2 text-neutral-400 hover:text-gray-800 transition-colors rounded-lg focus:outline-none" aria-label="Close">
+              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
+        </div>
+
+        <!-- Body scrolls independently within the remaining modal height -->
+        <div id="match-list-body" class="overflow-y-auto p-4 flex-1">
+            <!-- Match cards injected here -->
+        </div>
+
+    </div>
+</div>
 
 <script src="{{ url_for('static', filename='analytics.js') }}"></script>
 <script src="{{ url_for('static', filename='mobile-nav.js') }}"></script>

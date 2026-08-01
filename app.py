@@ -6,7 +6,7 @@ import os
 app = Flask(__name__)
 
 COOKIES = {
-    "USSQ-API-SESSION": "s%3AOtNA3Y-0lLikk6UoXkhsyaHc7kI4QnI4.nTYjY7wrJq56yThp1f2nJ%2F14ifEDDLSX9KGNGA%2BjKLg"
+    "USSQ-API-SESSION": "s%3A91Jljx_ZPF_B-uNFtHpYVnnO-58tVNFJ.rB2c%2BZht4NzgyLCCEnNV1wg5cmFLGsDtHdgUXDLWsIU"
 }
 
 logging.basicConfig(level=logging.INFO)

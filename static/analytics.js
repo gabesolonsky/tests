@@ -1,5 +1,8 @@
 // Global variable for the current user's ID
 let userId;
+// Full name of the current user, used to resolve which side (home/visiting)
+// they played in a match when match.Winner disagrees with match.wid1.
+let currentUserFullName = '';
 // Global AbortController to cancel requests on navigation
 let abortController = new AbortController();
 
@@ -12,8 +15,6 @@ const RATING_TIERS = [
   { name: 'Pro', min: 6.5, max: Infinity }
 ];
 
-const ANALYTICS_ACCESS_CODE = "0";
-const SESSION_STORAGE_KEY_ANALYTICS_ACCESS = 'analyticsAccessGranted';
 const MATCH_INSIGHTS_ACCESS_CODE = "0";
 const SESSION_STORAGE_KEY_MATCH_INSIGHTS = 'matchInsightsAccessGranted';
 const CONTACT_PHONE_NUMBER = "301-347-8710";
@@ -23,6 +24,36 @@ const CONTACT_PHONE_NUMBER = "301-347-8710";
  */
 function toggleSidebar() {
   document.getElementById("app").classList.toggle("sidebar-collapsed");
+}
+
+/**
+ * Updates the rank percentage text and progress bar element dynamically.
+ */
+function updateRankProgressDisplay(currentRating, tier) {
+  const progressTextEl = document.getElementById('rank-progress-text');
+  const progressBarEl = document.getElementById('rank-progress-bar');
+
+  if (!tier || tier.max === Infinity) {
+    if (progressTextEl) {
+      progressTextEl.textContent = "Max rank reached!";
+      progressTextEl.classList.remove('italic');
+    }
+    if (progressBarEl) progressBarEl.style.width = '100%';
+    return;
+  }
+
+  const range = tier.max - tier.min;
+  const progress = currentRating - tier.min;
+  let percentage = Math.round((progress / range) * 100);
+  percentage = Math.min(Math.max(percentage, 0), 100);
+
+  if (progressTextEl) {
+    progressTextEl.textContent = `${percentage}% through your rank`;
+    progressTextEl.classList.remove('italic');
+  }
+  if (progressBarEl) {
+    progressBarEl.style.width = `${percentage}%`;
+  }
 }
 
 /**
@@ -81,6 +112,9 @@ async function fetchCurrentUserRating(currentUserId) {
             if (currentTierNameDisplayEl) {
                 currentTierNameDisplayEl.textContent = currentTier ? currentTier.name : 'N/A';
             }
+
+            // Calculate and display rank progress percentage
+            updateRankProgressDisplay(currentRating, currentTier);
       
             const tooltipContentEl = document.getElementById('rating-tooltip-content');
             if (tooltipContentEl && currentTier && currentTierIndex < RATING_TIERS.length - 1) {
@@ -105,10 +139,20 @@ async function fetchCurrentUserRating(currentUserId) {
             if (currentTierNameDisplayEl) {
                     currentTierNameDisplayEl.textContent = 'N/A';
             }
+            const progressTextEl = document.getElementById('rank-progress-text');
+            if (progressTextEl) {
+                progressTextEl.textContent = "N/A";
+                progressTextEl.classList.remove('italic');
+            }
     }
   } catch (err) {
     console.error("Error fetching current rating:", err);
     document.getElementById("current-rating").textContent = "Error";
+    const progressTextEl = document.getElementById('rank-progress-text');
+    if (progressTextEl) {
+        progressTextEl.textContent = "Unable to calculate rank progress";
+        progressTextEl.classList.remove('italic');
+    }
   }
 }
 
@@ -269,9 +313,11 @@ async function calculateAverageOpponentRating(matchesToConsider, allMatches) {
 
 /**
  * Fetches and displays the monthly rating changes for the user with a modernized UI.
+ * Each month is clickable and opens a modal listing every match played that month.
  * @param {string} currentUserId - The ID of the user.
+ * @param {Array} allMatches - The complete list of the user's matches (for the click-through modal).
  */
-async function fetchAndDisplayMonthlyRatingChanges(currentUserId) {
+async function fetchAndDisplayMonthlyRatingChanges(currentUserId, allMatches) {
     const container = document.getElementById("monthly-rating-change-list");
     if (!container) return;
     container.innerHTML = '<p class="text-center text-gray-500 mt-10">Loading data...</p>';
@@ -306,16 +352,25 @@ async function fetchAndDisplayMonthlyRatingChanges(currentUserId) {
             let color = ytdChange > 0 ? 'text-green-600' : (ytdChange < 0 ? 'text-red-600' : 'text-gray-600');
             let sign = ytdChange > 0 ? '+' : '';
             if (ytdChange !== 0) {
-                ytdChangeHtml = `<div class="flex items-center justify-center gap-2 ${color}"><span class="font-semibold">YTD Change:</span> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="${icon}"/><path d="M12 ${ytdChange > 0 ? '19V5' : '5v14'}"/></svg> <span>${sign}${ytdChange.toFixed(2)}</span></div>`;
+                ytdChangeHtml = `<div class="flex items-center justify-center gap-2 ${color}"><span class="font-semibold">YTD Change:</span> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="${icon}"/><path d="M12 ${ytdChange > 0 ? '19V5' : '5v14'}"/></svg> <span class="font-semibold">${sign}${ytdChange.toFixed(2)}</span></div>`;
             } else {
-                ytdChangeHtml = `<div class="flex items-center justify-center gap-2 ${color}"><span class="font-semibold">YTD Change:</span><span>${ytdChange.toFixed(2)}</span></div>`;
+                ytdChangeHtml = `<div class="flex items-center justify-center gap-2 ${color}"><span class="font-semibold">YTD Change:</span><span class="font-semibold">${ytdChange.toFixed(2)}</span></div>`;
             }
         }
 
         let months = [];
         let currentDate = new Date();
+        currentDate.setDate(1); // Prevent duplicate months
+        
         for (let i = 0; i < 12; i++) {
-            months.push({ key: `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`, name: currentDate.toLocaleString('default', { month: 'long', year: 'numeric' }) });
+            months.push({
+                key: `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`,
+                name: currentDate.toLocaleString('default', {
+                    month: 'long',
+                    year: 'numeric'
+                })
+            });
+        
             currentDate.setMonth(currentDate.getMonth() - 1);
         }
         
@@ -335,10 +390,25 @@ async function fetchAndDisplayMonthlyRatingChanges(currentUserId) {
                     changeHtml = `<span class="text-md font-bold ${color}">${change.toFixed(2)}</span>`;
                 }
             }
-            html += `<li class="flex items-center justify-between p-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-sm"><div><div class="font-semibold text-gray-800">${month.name}</div></div><div class="flex flex-col items-end"><div class="h-5">${changeHtml}</div></div></li>`;
+            html += `<li class="flex items-center justify-between p-3 bg-white/60 backdrop-blur-sm border border-gray-200/80 rounded-xl shadow-sm cursor-pointer hover:bg-white hover:border-indigo-200 hover:shadow-md transition-all" data-month-key="${month.key}" data-month-name="${month.name}"><div><div class="font-semibold text-gray-800">${month.name}</div></div><div class="flex items-center gap-2"><div class="flex flex-col items-end"><div class="h-5">${changeHtml}</div></div><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div></li>`;
         });
         html += '</ul>';
         container.innerHTML = html;
+
+        // Make each month row clickable -> show every match played that month
+        container.querySelectorAll('li[data-month-key]').forEach(li => {
+            li.addEventListener('click', () => {
+                const key = li.dataset.monthKey;
+                const monthName = li.dataset.monthName;
+                const monthMatches = (allMatches || []).filter(m => {
+                    if (!m.MatchDate) return false;
+                    const d = new Date(m.MatchDate);
+                    const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    return mk === key;
+                });
+                showMatchListModal(`Matches — ${monthName}`, monthMatches, currentUserId);
+            });
+        });
 
     } catch (error) {
         console.error("Error fetching or rendering monthly rating changes:", error);
@@ -347,9 +417,7 @@ async function fetchAndDisplayMonthlyRatingChanges(currentUserId) {
 }
 
 /**
- * Fetches and displays the user's top opponents by rating.
- * @param {string} currentUserId - The ID of the user.
- * @param {Array} allMatches - The complete list of the user's matches.
+ * Optimized fetchAndDisplayTopOpponents
  */
 async function fetchAndDisplayTopOpponents(currentUserId, allMatches) {
     const container = document.getElementById("top-opponents-list");
@@ -361,37 +429,72 @@ async function fetchAndDisplayTopOpponents(currentUserId, allMatches) {
     container.innerHTML = '<p class="text-center text-gray-500 mt-10">Analyzing opponents...</p>';
 
     const opponentData = new Map();
+    const uid = parseInt(currentUserId);
+
+    // 1. Group matches by opponent
     allMatches.forEach(match => {
-        const opponentId = match.wid1 === parseInt(currentUserId) ? match.oid1 : match.wid1;
-        const opponentName = match.wid1 === parseInt(currentUserId) ? match.vplayer1 : match.hplayer1;
-        if (opponentId && opponentName) {
-            if (!opponentData.has(opponentId)) opponentData.set(opponentId, { name: opponentName, rating: 0, matches: [] });
+        const opponentId = match.wid1 === uid ? match.oid1 : match.wid1;
+        const opponentName = getOpponentDisplayName(match, uid, currentUserFullName);
+        if (opponentId && opponentId !== -1 && opponentName) {
+            if (!opponentData.has(opponentId)) {
+                opponentData.set(opponentId, { name: opponentName, rating: 0, matches: [] });
+            }
             opponentData.get(opponentId).matches.push(match);
         }
     });
 
-    const ratingPromises = Array.from(opponentData.keys()).map(async (id) => {
-        if (id && id !== -1) {
-            try {
-                const res = await fetch(`/proxy/user/${id}/ratings-top`, { signal: abortController.signal });
-                if (!res.ok) return;
-                const ratingData = await res.json();
-                if (ratingData && ratingData.length > 0 && typeof ratingData[0].rating === 'number') {
-                    opponentData.get(id).rating = ratingData[0].rating;
-                }
-            } catch (e) {
-                console.error(`Could not fetch rating for opponent ${id}`, e);
+    // 2. Filter out opponents with very few matches if the dataset is huge (Optional)
+    const opponentEntries = Array.from(opponentData.entries());
+
+    // 3. Fetch ratings in parallel with concurrency limit or Promise.all
+    // Adding a simple in-memory cache check so we never re-fetch the same opponent twice in a session
+    if (!window.opponentRatingCache) window.opponentRatingCache = new Map();
+
+    const ratingPromises = opponentEntries.map(async ([id, data]) => {
+        // Check cache first
+        if (window.opponentRatingCache.has(id)) {
+            data.rating = window.opponentRatingCache.get(id);
+            return;
+        }
+
+        try {
+            const res = await fetch(`/proxy/user/${id}/ratings-top`, { signal: abortController.signal });
+            if (!res.ok) return;
+            const ratingData = await res.json();
+            if (ratingData && ratingData.length > 0 && typeof ratingData[0].rating === 'number') {
+                const rating = ratingData[0].rating;
+                data.rating = rating;
+                window.opponentRatingCache.set(id, rating); // Save to cache
             }
+        } catch (e) {
+            console.error(`Could not fetch rating for opponent ${id}`, e);
         }
     });
+
     await Promise.all(ratingPromises);
 
-    const sortedOpponents = Array.from(opponentData.values()).filter(opp => opp.rating > 0).sort((a, b) => b.rating - a.rating).slice(0, 5);
+    // 4. Sort and render top 5
+    const sortedOpponents = Array.from(opponentData.values())
+        .filter(opp => opp.rating > 0)
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 5);
+
+    if (sortedOpponents.length === 0) {
+        container.innerHTML = '<p class="text-center text-gray-500 mt-10">No opponent rating data found.</p>';
+        return;
+    }
+
     let html = '<div class="space-y-3">';
     sortedOpponents.forEach(opponent => {
-        const lastMatch = opponent.matches.sort((a,b) => new Date(b.MatchDate) - new Date(a.MatchDate))[0];
-        const didWin = lastMatch.wid1 === parseInt(currentUserId);
-        html += `<div class="event-card ${didWin ? "win" : "lose"}" data-matchid="${lastMatch.Matchid}" data-home-player-name="${lastMatch.hplayer1 || 'Home Player'}" data-visiting-player-name="${lastMatch.vplayer1 || 'Visiting Player'}"><img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" class="event-logo" alt="Match" /><div class="event-details"><p><strong>vs. ${opponent.name} (${opponent.rating.toFixed(2)})</strong></p><p>Score: ${lastMatch.Score}</p></div></div>`;
+        const lastMatch = opponent.matches.sort((a, b) => new Date(b.MatchDate) - new Date(a.MatchDate))[0];
+        const didWin = didUserWinMatch(lastMatch, uid, currentUserFullName);
+        html += `<div class="event-card ${didWin ? "win" : "lose"}" data-matchid="${lastMatch.Matchid}" data-home-player-name="${lastMatch.hplayer1 || 'Home Player'}" data-visiting-player-name="${lastMatch.vplayer1 || 'Visiting Player'}">
+            <img src="https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png" class="event-logo" alt="Match" />
+            <div class="event-details">
+                <p><strong>vs. ${opponent.name} (${opponent.rating.toFixed(2)})</strong></p>
+                <p>Score: ${lastMatch.Score}</p>
+            </div>
+        </div>`;
     });
     html += '</div>';
     container.innerHTML = html;
@@ -411,36 +514,51 @@ function displayLastMatch(currentUserId, allMatches) {
     }
 
     const lastMatch = allMatches[0];
-    const didWin = lastMatch.wid1 === parseInt(currentUserId);
-    const opponentName = didWin ? lastMatch.vplayer1 : lastMatch.hplayer1;
+    const uid = parseInt(currentUserId);
+    const didWin = didUserWinMatch(lastMatch, uid, currentUserFullName);
+    const opponentName = getOpponentDisplayName(lastMatch, uid, currentUserFullName);
     const date = new Date(lastMatch.MatchDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    container.innerHTML = `<div class="event-card ${didWin ? "win" : "lose"}" data-matchid="${lastMatch.Matchid}" data-home-player-name="${lastMatch.hplayer1 || 'Home Player'}" data-visiting-player-name="${lastMatch.vplayer1 || 'Visiting Player'}"><img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" class="event-logo" alt="Match" /><div class="event-details"><p><strong>vs. ${opponentName}</strong></p><p>Score: ${lastMatch.Score}</p><p class="text-xs text-gray-500">${date}</p></div></div>`;
+    container.innerHTML = `<div class="event-card ${didWin ? "win" : "lose"}" data-matchid="${lastMatch.Matchid}" data-home-player-name="${lastMatch.hplayer1 || 'Home Player'}" data-visiting-player-name="${lastMatch.vplayer1 || 'Visiting Player'}"><img src="https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png" class="event-logo" alt="Match" /><div class="event-details"><p><strong>vs. ${opponentName}</strong></p><p>Score: ${lastMatch.Score}</p><p class="text-xs text-gray-500">${date}</p></div></div>`;
 }
 
 /**
- * Fetches all matches for a user by paginating through the API.
+ * Fetches all matches for a user in parallel batches rather than sequentially.
  * @returns {Promise<Array>} A promise that resolves to an array of all matches.
  */
 async function fetchAllMatches(currentUserId) {
     let allMatches = [];
     let page = 1;
+    const BATCH_SIZE = 5; // Fetch 5 pages concurrently at a time
     let hasMore = true;
+
     while (hasMore) {
+        // Create an array of page numbers to fetch in this batch
+        const pageNumbers = Array.from({ length: BATCH_SIZE }, (_, i) => page + i);
+
         try {
-            const response = await fetch(`/proxy/user/${currentUserId}/matches/page/${page}`, { signal: abortController.signal });
-            if (!response.ok) { hasMore = false; continue; }
-            const data = await response.json();
-            if (data.matches && data.matches.length > 0) {
-                allMatches.push(...data.matches);
-                page++;
-            } else {
-                hasMore = false;
+            const fetchPromises = pageNumbers.map(p => 
+                fetch(`/proxy/user/${currentUserId}/matches/page/${p}`, { signal: abortController.signal })
+                    .then(res => res.ok ? res.json() : null)
+                    .catch(() => null)
+            );
+
+            const results = await Promise.all(fetchPromises);
+
+            for (const data of results) {
+                if (data && data.matches && data.matches.length > 0) {
+                    allMatches.push(...data.matches);
+                } else {
+                    hasMore = false; // Stop if any page returns no matches
+                }
             }
+
+            page += BATCH_SIZE;
         } catch (error) {
-            console.error("Critical error fetching matches:", error);
+            console.error("Error fetching match batch:", error);
             hasMore = false;
         }
     }
+
     return allMatches.sort((a, b) => new Date(b.MatchDate) - new Date(a.MatchDate));
 }
 
@@ -512,79 +630,9 @@ function formatDurationSec(totalSeconds) {
  * Fetches and calculates advanced match statistics like match and point durations.
  * @param {Array} allMatches - An array of the user's matches.
  */
+
 async function fetchAdvancedMatchInsights(allMatches) {
-    const insightIds = ['average-match-length', 'longest-match-length', 'shortest-match-length', 'average-point-length', 'longest-point-length', 'shortest-point-length'];
-    insightIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = 'Loading...';
-    });
-    
-    if (!allMatches || allMatches.length === 0) {
-        insightIds.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = 'N/A';
-        });
-        return;
-    }
-
-    let matchesWithInsights = [];
-    const pointLengths = [];
-    const MIN_POINT_DURATION_SEC = 4;
-    const MAX_POINT_DURATION_SEC = 150;
-    const MIN_MATCH_DURATION_SEC = 240;
-
-    await Promise.all(allMatches.map(async (match) => {
-        try {
-            const res = await fetch(`/proxy/liveScoreDetails?match_id=${match.Matchid}`, { signal: abortController.signal });
-            if (!res.ok) return;
-            const details = await res.json();
-            if (!details || details.length < 2) return;
-            const allPoints = details.filter(evt => evt.Decision === "point").sort((a, b) => new Date(a.StartDate) - new Date(b.StartDate));
-            if (allPoints.length < 2) return;
-
-            const matchStart = new Date(allPoints[0].StartDate);
-            const matchEnd = new Date(allPoints[allPoints.length - 1].StartDate);
-            const matchDurationSec = (matchEnd - matchStart) / 1000;
-            
-            if (matchDurationSec >= MIN_MATCH_DURATION_SEC) {
-                matchesWithInsights.push({ duration: matchDurationSec, match: match });
-            }
-
-            for (let i = 1; i < allPoints.length; i++) {
-                const diffSec = (new Date(allPoints[i].StartDate) - new Date(allPoints[i - 1].StartDate)) / 1000;
-                if (diffSec >= MIN_POINT_DURATION_SEC && diffSec <= MAX_POINT_DURATION_SEC) {
-                    pointLengths.push(diffSec);
-                }
-            }
-        } catch (e) { /* Silently ignore */ }
-    }));
-
-    if (matchesWithInsights.length > 0) {
-        const avgMatchLength = matchesWithInsights.reduce((a, b) => a + b.duration, 0) / matchesWithInsights.length;
-        matchesWithInsights.sort((a, b) => a.duration - b.duration);
-        const shortestMatch = matchesWithInsights[0];
-        const longestMatch = matchesWithInsights[matchesWithInsights.length - 1];
-
-        document.getElementById('average-match-length').textContent = formatDurationSec(avgMatchLength);
-        document.getElementById('longest-match-length').textContent = formatDurationSec(longestMatch.duration);
-        document.getElementById('shortest-match-length').textContent = formatDurationSec(shortestMatch.duration);
-
-        const longestContainer = document.getElementById('longest-match-container');
-        const shortestContainer = document.getElementById('shortest-match-container');
-        if (longestContainer) longestContainer.onclick = () => showGraphModal(longestMatch.match);
-        if (shortestContainer) shortestContainer.onclick = () => showGraphModal(shortestMatch.match);
-    } else {
-        ['average-match-length', 'longest-match-length', 'shortest-match-length'].forEach(id => document.getElementById(id).textContent = 'N/A');
-    }
-
-    if (pointLengths.length > 0) {
-        const avgPoint = pointLengths.reduce((a, b) => a + b, 0) / pointLengths.length;
-        document.getElementById('average-point-length').textContent = formatDurationSec(avgPoint);
-        document.getElementById('longest-point-length').textContent = formatDurationSec(Math.max(...pointLengths));
-        document.getElementById('shortest-point-length').textContent = formatDurationSec(Math.min(...pointLengths));
-    } else {
-        ['average-point-length', 'longest-point-length', 'shortest-point-length'].forEach(id => document.getElementById(id).textContent = 'N/A');
-    }
+    return;
 }
 
 // --- START: Match Insights Modal Functions ---
@@ -794,8 +842,281 @@ async function loadMatchInsights(match, container) {
 }
 
 
+// --- START: Shared Match Card / Match List Modal Helpers ---
+
+/**
+ * Normalizes a player name for robust comparison (collapses whitespace, lowercases).
+ */
+function normalizeName(name) {
+    return (name || '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/**
+ * Determines whether the current user was the home or visiting player in a
+ * match, by matching their name against hplayer1/vplayer1. Returns null if
+ * the user's name isn't available or doesn't clearly match either side.
+ */
+function isUserHomePlayer(match, userFullName) {
+    const normalizedUser = normalizeName(userFullName);
+    if (!normalizedUser) return null;
+    const isHome = normalizeName(match.hplayer1).includes(normalizedUser);
+    const isVisiting = normalizeName(match.vplayer1).includes(normalizedUser);
+    if (isHome && !isVisiting) return true;
+    if (isVisiting && !isHome) return false;
+    return null;
+}
+
+/**
+ * Determines whether the given user won a match.
+ *
+ * match.wid1 (winner id) is correct for the vast majority of matches, but on
+ * some records the authoritative match.Winner field ("H"/"V") disagrees with
+ * wid1 — e.g. a disputed/corrected result where Winner was updated but wid1
+ * wasn't resynced. When Winner is present and we can confidently tell (by
+ * name) which side the user played, Winner takes priority over wid1.
+ */
+function didUserWinMatch(match, uid, userFullName) {
+    const widSaysWin = match.wid1 === uid;
+
+    if (match.Winner === 'H' || match.Winner === 'V') {
+        const isHome = isUserHomePlayer(match, userFullName);
+        if (isHome !== null) {
+            return isHome ? match.Winner === 'H' : match.Winner === 'V';
+        }
+    }
+
+    return widSaysWin;
+}
+
+/**
+ * Determines the opponent's display name for a match, preferring a name-based
+ * home/visiting resolution over the wid1 heuristic (see didUserWinMatch).
+ */
+function getOpponentDisplayName(match, uid, userFullName) {
+    const isHome = isUserHomePlayer(match, userFullName);
+    if (isHome !== null) return isHome ? match.vplayer1 : match.hplayer1;
+    return match.wid1 === uid ? match.vplayer1 : match.hplayer1;
+}
+
+
+/**
+ * Determines whether the given user won a match and who their opponent was.
+ * @param {object} match - A match object from the matches API.
+ * @param {string|number} userId - The user's id.
+ */
+function getUserMatchOutcome(match, userId) {
+    const uid = parseInt(userId);
+    const didWin = didUserWinMatch(match, uid, currentUserFullName);
+    const opponentName = getOpponentDisplayName(match, uid, currentUserFullName) || 'Opponent';
+    return { didWin, opponentName };
+}
+
+/**
+ * Formats a match's per-game "Score" string (e.g. "11-5,7-11,11-9") so the
+ * given user's own score is always listed first, regardless of which side
+ * of the raw data they were recorded as.
+ */
+function formatMatchScoreForUser(match, didWin) {
+    if (!match.Score) return 'N/A';
+    const games = match.Score.split(',');
+    const formattedGames = games.map(game => {
+        const parts = game.trim().split('-');
+        if (parts.length !== 2) return game.trim();
+        const [left, right] = parts;
+        return didWin ? `${left}-${right}` : `${right}-${left}`;
+    });
+    return formattedGames.join(', ');
+}
+
+/**
+ * Renders a single match as the same "event-card" style used elsewhere in analytics,
+ * wired up with the data attributes setupModalListeners() expects for click-through
+ * to the detailed Match Insights modal.
+ */
+function renderMatchEventCardHTML(match, userId) {
+    const { didWin, opponentName } = getUserMatchOutcome(match, userId);
+    const resultClass = didWin ? 'win' : 'lose';
+    const score = formatMatchScoreForUser(match, didWin);
+    const date = match.MatchDate ? new Date(match.MatchDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    return `<div class="event-card ${resultClass}" data-matchid="${match.Matchid}" data-home-player-name="${match.hplayer1 || 'Home Player'}" data-visiting-player-name="${match.vplayer1 || 'Visiting Player'}">
+        <img src="https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png" class="event-logo" alt="Match" />
+        <div class="event-details">
+            <p><strong>vs. ${opponentName}</strong></p>
+            <p>Score: ${score}</p>
+            <p class="text-xs text-gray-500">${date}</p>
+        </div>
+    </div>`;
+}
+
+/**
+ * Opens the generic match-list modal with a title and a set of matches
+ * (used for "matches this month" and "comeback wins").
+ */
+function showMatchListModal(title, matches, userId) {
+    const modal = document.getElementById('match-list-modal');
+    const titleEl = document.getElementById('match-list-title');
+    const bodyEl = document.getElementById('match-list-body');
+    if (!modal || !bodyEl) return;
+
+    if (titleEl) titleEl.textContent = title;
+
+    if (!matches || matches.length === 0) {
+        bodyEl.innerHTML = '<p class="text-center text-gray-500 py-10">No matches found.</p>';
+    } else {
+        const sorted = [...matches].sort((a, b) => new Date(b.MatchDate) - new Date(a.MatchDate));
+        bodyEl.innerHTML = `<div class="space-y-3">${sorted.map(m => renderMatchEventCardHTML(m, userId)).join('')}</div>`;
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeMatchListModal() {
+    const modal = document.getElementById('match-list-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+/**
+ * Computes the user's current streak plus their all-time highest win and loss streaks.
+ * @param {Array} allMatches - The complete list of the user's matches.
+ * @param {string|number} userId - The user's id.
+ */
+function computeStreaks(allMatches, userId) {
+    const uid = parseInt(userId);
+    const sorted = (allMatches || [])
+        .filter(m => (m.wid1 === uid || m.oid1 === uid) && m.MatchDate)
+        .sort((a, b) => new Date(a.MatchDate) - new Date(b.MatchDate));
+
+    let highestWinStreak = 0, highestLossStreak = 0;
+    let runWin = 0, runLoss = 0;
+
+    sorted.forEach(m => {
+        if (didUserWinMatch(m, uid, currentUserFullName)) {
+            runWin++; runLoss = 0;
+            if (runWin > highestWinStreak) highestWinStreak = runWin;
+        } else {
+            runLoss++; runWin = 0;
+            if (runLoss > highestLossStreak) highestLossStreak = runLoss;
+        }
+    });
+
+    let currentStreakType = null, currentStreakCount = 0;
+    for (let i = sorted.length - 1; i >= 0; i--) {
+        const type = didUserWinMatch(sorted[i], uid, currentUserFullName) ? 'W' : 'L';
+        if (currentStreakType === null) {
+            currentStreakType = type;
+            currentStreakCount = 1;
+        } else if (type === currentStreakType) {
+            currentStreakCount++;
+        } else {
+            break;
+        }
+    }
+
+    return { currentStreakType, currentStreakCount, highestWinStreak, highestLossStreak };
+}
+
+function renderStreaks(container, streaks) {
+    if (!container) return;
+    if (!streaks.currentStreakType) {
+        container.innerHTML = '<p class="text-center text-gray-500 mt-10">No match history available.</p>';
+        return;
+    }
+    const isWinStreak = streaks.currentStreakType === 'W';
+    container.innerHTML = `
+        <div class="flex justify-between items-center p-3 rounded-xl ${isWinStreak ? 'bg-green-100' : 'bg-red-100'}">
+            <span class="font-medium text-gray-700">Current ${isWinStreak ? 'Win' : 'Loss'} Streak</span>
+            <span class="text-lg font-bold ${isWinStreak ? 'text-green-600' : 'text-red-600'}">${streaks.currentStreakCount}${isWinStreak ? 'W' : 'L'}</span>
+        </div>
+        <div class="flex justify-between items-center p-2">
+            <span class="text-gray-600">Highest Win Streak</span>
+            <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">${streaks.highestWinStreak}</span>
+        </div>
+        <div class="flex justify-between items-center p-2">
+            <span class="text-gray-600">Highest Loss Streak</span>
+            <span class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">${streaks.highestLossStreak}</span>
+        </div>
+    `;
+}
+function isComeback(match, userId) {
+    const uid = parseInt(userId, 10);
+
+    // Must have score and must have won the match
+    if (!match.Score || match.wid1 !== uid) return false;
+
+    // Parse games: "11-7 6-11 11-9" → [[11,7],[6,11],[11,9]]
+    const games = match.Score.split(/\s+/)
+        .map(g => g.split('-').map(Number))
+        .filter(arr => arr.length === 2);
+
+    if (games.length === 0) return false;
+
+    // Determine if user is home or visiting
+    const userIsHome = match.hid === uid;
+
+    // Check game 1
+    const [g1h, g1v] = games[0];
+    const userLostGame1 = userIsHome ? g1h < g1v : g1v < g1h;
+
+    // Check game 2 (if exists)
+    let userLostGame2 = false;
+    if (games.length > 1) {
+        const [g2h, g2v] = games[1];
+        userLostGame2 = userIsHome ? g2h < g2v : g2v < g2h;
+    }
+
+    // Comeback = lost game 1 OR lost game 2
+    return userLostGame1 || userLostGame2;
+}
+
+/**
+ * Renders the Comeback Tracker widget inside the specified container.
+ */
+function renderComebackTracker(container, stats, userId) {
+    if (!container) return;
+    
+    if (!stats.comebackMatches || stats.comebackMatches.length === 0) {
+        container.innerHTML = `
+            <p class="text-center text-gray-500 mt-10">No comeback wins yet.</p>
+            <p class="text-xs text-center text-gray-400 mt-2">A comeback is a match you won after falling behind in games.</p>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div id="comeback-count-trigger" class="flex justify-between items-center p-3 rounded-xl bg-indigo-100 cursor-pointer hover:bg-indigo-200 transition-colors">
+            <span class="font-medium text-gray-700">Comeback Wins</span>
+            <span class="text-lg font-bold text-indigo-600">${stats.totalComebacks}</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 pt-2">
+            <div class="bg-gray-100 p-3 rounded-xl text-center border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium">Down 1 Game</p>
+                <p class="text-lg font-bold text-indigo-600 mt-1">${stats.down1Rate}%</p>
+                <p class="text-[10px] text-gray-500">${stats.down1Wins}/${stats.down1Opportunities} won</p>
+            </div>
+            <div class="bg-gray-100 p-3 rounded-xl text-center border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium">Down 2 Games</p>
+                <p class="text-lg font-bold text-indigo-600 mt-1">${stats.down2Rate}%</p>
+                <p class="text-[10px] text-gray-500">${stats.down2Wins}/${stats.down2Opportunities} won</p>
+            </div>
+        </div>
+        <p class="text-xs text-gray-500 mt-2 text-center">Tap Comeback Wins to view matches.</p>
+    `;
+
+    const trigger = container.querySelector('#comeback-count-trigger');
+    if (trigger) {
+        trigger.addEventListener('click', () => showMatchListModal('Comeback Wins', stats.comebackMatches, userId));
+    }
+}
+
+// --- END: Shared Match Card / Match List Modal Helpers ---
+
+
 function setupModalListeners() {
-    const containers = [ document.getElementById('top-opponents-list'), document.getElementById('last-match-details') ];
+    const containers = [ document.getElementById('top-opponents-list'), document.getElementById('last-match-details'), document.getElementById('match-list-body') ];
     containers.forEach(container => {
         if (container) {
             container.addEventListener('click', (event) => {
@@ -816,11 +1137,122 @@ function setupModalListeners() {
     const closeButton = document.getElementById("graph-close");
     if (closeButton) closeButton.addEventListener("click", closeGraphModal);
     if (graphModal) graphModal.addEventListener("click", (e) => { if (e.target === graphModal) closeGraphModal(); });
+
+    const matchListModal = document.getElementById("match-list-modal");
+    const matchListClose = document.getElementById("match-list-close");
+    if (matchListClose) matchListClose.addEventListener("click", closeMatchListModal);
+    if (matchListModal) matchListModal.addEventListener("click", (e) => { if (e.target === matchListModal) closeMatchListModal(); });
 }
 
 
 // --- END: Match Insights Modal Functions ---
 
+/**
+ * Evaluates match comeback metrics: total comeback wins, 
+ * wins after being down 1 game, and wins after being down 2 games.
+ */
+function computeComebackStats(allMatches, userId) {
+    const uid = parseInt(userId, 10);
+    let totalComebacks = 0;
+    let down1Opportunities = 0;
+    let down1Wins = 0;
+    let down2Opportunities = 0;
+    let down2Wins = 0;
+
+    const comebackMatches = [];
+
+    (allMatches || []).forEach(match => {
+        if (!match.Score) return;
+        const games = match.Score.split(',').map(g => g.trim()).filter(Boolean);
+        if (games.length === 0) return;
+
+        // The match winner's per-game score is always listed FIRST in match.Score
+        // (see formatMatchScoreForUser). didUserWinMatch prefers the authoritative
+        // Winner field over wid1 when they disagree (wid1 can be stale on
+        // corrected/disputed match records).
+        const didWin = didUserWinMatch(match, uid, currentUserFullName);
+
+        let userWins = 0;
+        let oppWins = 0;
+        let wasDown1 = false;
+        let wasDown2 = false;
+        let everBehind = false;
+
+        for (const g of games) {
+            // Check deficits *before* tallying the current game result
+            const diff = oppWins - userWins;
+            if (diff === 1) wasDown1 = true;
+            if (diff >= 2) wasDown2 = true;
+            if (oppWins > userWins) everBehind = true;
+
+            const parts = g.split('-').map(n => parseInt(n, 10));
+            if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) continue;
+
+            const [winnerSideScore, loserSideScore] = parts;
+            const userScore = didWin ? winnerSideScore : loserSideScore;
+            const oppScore = didWin ? loserSideScore : winnerSideScore;
+
+            if (userScore > oppScore) {
+                userWins++;
+            } else if (oppScore > userScore) {
+                oppWins++;
+            }
+        }
+
+        // Final check after loop in case deficit happened right before winning the match
+        if (oppWins - userWins === 1) wasDown1 = true;
+        if (oppWins - userWins >= 2) wasDown2 = true;
+        if (oppWins > userWins) everBehind = true;
+
+        if (wasDown1) {
+            down1Opportunities++;
+            if (didWin) down1Wins++;
+        }
+        if (wasDown2) {
+            down2Opportunities++;
+            if (didWin) down2Wins++;
+        }
+
+        if (didWin && (everBehind || wasDown1 || wasDown2)) {
+            totalComebacks++;
+            comebackMatches.push(match);
+        }
+    });
+
+    return {
+        totalComebacks,
+        comebackMatches,
+        down1Rate: down1Opportunities > 0 ? Math.round((down1Wins / down1Opportunities) * 100) : 0,
+        down1Wins,
+        down1Opportunities,
+        down2Rate: down2Opportunities > 0 ? Math.round((down2Wins / down2Opportunities) * 100) : 0,
+        down2Wins,
+        down2Opportunities
+    };
+}
+/**
+ * Helper to fade out the loading overlay smoothly.
+ */
+function fadeOutLoadingOverlay() {
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+        loadingOverlay.style.opacity = '0';
+        setTimeout(() => {
+            loadingOverlay.style.display = 'none';
+        }, 300);
+    }
+}
+
+/**
+ * Initializes the analytics dashboard view and loads metrics components.
+ */
+function initializeAnalyticsPage(allMatches, currentUserId) {
+    const comebackContainer = document.getElementById('comeback-tracker-container');
+    if (comebackContainer) {
+        const comebackStats = computeComebackStats(allMatches, currentUserId);
+        renderComebackTracker(comebackContainer, comebackStats, currentUserId);
+    }
+}
 
 /**
  * Main function to initialize the page and fetch all necessary data.
@@ -839,6 +1271,7 @@ async function initializePage(currentUserId) {
     try {
         const response = await fetch(`/proxy/user/${currentUserId}`, { signal: abortController.signal });
         const userData = await response.json();
+        currentUserFullName = [userData.firstName, userData.lastName].filter(Boolean).join(' ').trim();
         document.getElementById('welcome-message').textContent = `Welcome Back, ${userData.firstName} 🎉`;
     } catch (e) {
         if (e.name !== 'AbortError') {
@@ -847,56 +1280,44 @@ async function initializePage(currentUserId) {
         }
     }
 
+    // Fade out loading overlay after initial data loads (with a brief delay for perception)
+    setTimeout(() => {
+        fadeOutLoadingOverlay();
+    }, 1500);
+
     fetchCurrentUserRating(currentUserId);
     fetchWeeklyRankings(currentUserId);
-    fetchAndDisplayMonthlyRatingChanges(currentUserId);
     fetchMatchStatistics(currentUserId);
 
     const allMatches = await fetchAllMatches(currentUserId);
 
+    renderStreaks(document.getElementById('streaks-container'), computeStreaks(allMatches, currentUserId));
+    const comebackStats = computeComebackStats(allMatches, currentUserId);
+    renderComebackTracker(document.getElementById('comeback-tracker-container'), comebackStats, currentUserId);
+
+    fetchAndDisplayMonthlyRatingChanges(currentUserId, allMatches);
     calculateAverageOpponentRating(25, allMatches);
-    fetchAndDisplayTopOpponents(currentUserId, allMatches);
     displayLastMatch(currentUserId, allMatches);
     fetchAdvancedMatchInsights(allMatches);
+
+
+
     setupModalListeners();
 
     document.getElementById('last-updated-date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+
+    // Load Top Opponents widget last since it performs multiple opponent rating API fetches
+    await fetchAndDisplayTopOpponents(currentUserId, allMatches);
 }
 
 
 // --- EVENT LISTENERS ---
 
 document.addEventListener('DOMContentLoaded', () => {
-    const passwordModal = document.getElementById('password-modal');
     const appContainer = document.getElementById('app');
-    const passwordInput = document.getElementById('password-input');
-    const passwordSubmitBtn = document.getElementById('password-submit-btn');
-    const passwordErrorMsg = document.getElementById('password-error-message');
+    if (appContainer) appContainer.style.display = 'flex';
 
-    const checkAccess = () => {
-        if (sessionStorage.getItem(SESSION_STORAGE_KEY_ANALYTICS_ACCESS) === 'true') {
-            passwordModal.style.display = 'none';
-            appContainer.style.display = 'flex';
-            loadPageContent(); 
-        } else {
-            passwordModal.style.display = 'flex';
-            appContainer.style.display = 'none';
-        }
-    };
-
-    const handlePasswordSubmit = () => {
-        if (passwordInput.value === ANALYTICS_ACCESS_CODE) {
-            sessionStorage.setItem(SESSION_STORAGE_KEY_ANALYTICS_ACCESS, 'true');
-            checkAccess();
-        } else {
-            passwordErrorMsg.classList.remove('hidden');
-            passwordInput.value = '';
-        }
-    };
-
-    if(passwordSubmitBtn) passwordSubmitBtn.addEventListener('click', handlePasswordSubmit);
-    if(passwordInput) passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handlePasswordSubmit(); });
-
+    // Show the app first, then initialize and fade out loading
     const loadPageContent = () => {
         const urlParams = new URLSearchParams(window.location.search);
         let idFromUrl = urlParams.get('userId');
@@ -930,5 +1351,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    checkAccess();
+    loadPageContent();
 });

@@ -7,6 +7,10 @@ const DIVISION_IDS = {
   womensClub: 5735
 };
 
+// Cache of { id, name, logo } for each division's teams, populated whenever standings are rendered.
+// Used to populate the "opponent" picker in the Match Predictor.
+window.__teamsByDivision = window.__teamsByDivision || {};
+
 // Friendly section titles for badges and navigation
 const SECTION_TITLES = {
   'mens-varsity-content': "Men's Varsity",
@@ -109,6 +113,11 @@ async function fetchAndRenderSectionStandings(containerId, divisionId) {
     }
     columnsHolder.innerHTML = '';
 
+    // Cache this division's teams (id/name/logo) for the Match Predictor's opponent picker
+    window.__teamsByDivision[divisionId] = items
+      .map(row => ({ id: getTeamIdFromRow(row), name: (row.Teamname || row.TeamDescr || row.PlayerDescr || row.TeamName || row.Name || ''), logo: row.LogoImageUrl || row.logo || '' }))
+      .filter(t => t.id);
+
     // Check if mobile
     const isMobile = window.innerWidth <= 767;
 
@@ -209,7 +218,7 @@ async function fetchAndRenderSectionStandings(containerId, divisionId) {
       // clicking a row shows the team roster (falls back to division view if no team id)
       rowEl.onclick = () => {
         const tid = getTeamIdFromRow(row);
-        if (tid) showTeamPreview(tid, name, logo, winsLossesDisplay, indDisplay, pctDisplay);
+        if (tid) showTeamPreview(tid, name, logo, winsLossesDisplay, indDisplay, pctDisplay, divisionId);
         else loadDivision(divisionId);
       };
 
@@ -312,6 +321,19 @@ function createTeamPreviewModal() {
                 <div class="flex items-center gap-3"><div class="spinner" aria-hidden="true"></div><div class="text-sm text-gray-500">Loading schedule…</div></div>
               </div>
             </div>
+            <div id="match-predictor" class="mt-2 pt-4 border-t border-gray-200">
+              <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple-600"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                Match Predictor
+              </h4>
+              <div class="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                <select id="match-predictor-opponent" class="flex-1 text-sm border border-gray-300 rounded-md px-3 py-2 bg-white">
+                  <option value="">Select an opponent team…</option>
+                </select>
+                <button id="match-predictor-btn" class="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md disabled:opacity-50 disabled:cursor-not-allowed" disabled>Predict</button>
+              </div>
+              <div id="match-predictor-result" class="mt-3"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -338,13 +360,18 @@ function createTeamPreviewModal() {
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hideTeamPreview(); });
 }
 
-function showTeamPreview(teamId, teamName, teamLogo, winsLossesDisplay = '', indDisplay = '', pctDisplay = '') {
+function showTeamPreview(teamId, teamName, teamLogo, winsLossesDisplay = '', indDisplay = '', pctDisplay = '', divisionId = null) {
   createTeamPreviewModal();
   const wrap = document.getElementById('team-preview-modal');
   wrap.setAttribute('data-team', teamId);
+  wrap.setAttribute('data-division', divisionId != null ? divisionId : '');
   // store provided logo so modal can show it
   wrap.setAttribute('data-team-logo', teamLogo || '');
   wrap.classList.remove('hidden');
+  wrap.classList.add('flex');
+  // Reset per-open predictor state so a previous team's cached roster/opponent list doesn't leak in
+  wrap.__teamAPlayers = [];
+  wrap.__opponentCache = {};
   const titleEl = document.getElementById('team-preview-name');
   const subEl = document.getElementById('team-preview-sub');
   const body = document.getElementById('team-preview-body');
@@ -445,9 +472,33 @@ function showTeamPreview(teamId, teamName, teamLogo, winsLossesDisplay = '', ind
   }).catch((e) => { console.error('Error loading team schedule', teamId, e); if (schedEl) schedEl.innerHTML = '<p class="text-sm text-red-500">Failed to load schedule.</p>'; });
 }
 
+// Pulls a numeric rating off a player object, trying the various field names used across the API.
+function getPlayerRating(p) {
+  const r = p.CurrentRating ?? p.Rating ?? p.RatingValue ?? p.RatingOther ?? null;
+  const n = typeof r === 'number' ? r : parseFloat(r);
+  return isNaN(n) ? null : n;
+}
+
+// Predicts a team-vs-team score by pairing each side's top players (by rating), highest vs highest,
+// down to a maximum of 9 matchups (a standard college squash lineup), and tallying who'd win each.
+function predictTeamMatch(teamAPlayers, teamBPlayers) {
+  const ratedA = (teamAPlayers || []).map(getPlayerRating).filter(r => r !== null).sort((a, b) => b - a);
+  const ratedB = (teamBPlayers || []).map(getPlayerRating).filter(r => r !== null).sort((a, b) => b - a);
+  const matchupCount = Math.min(9, ratedA.length, ratedB.length);
+  if (matchupCount === 0) return null;
+
+  let teamAWins = 0, teamBWins = 0, ties = 0;
+  for (let i = 0; i < matchupCount; i++) {
+    if (ratedA[i] > ratedB[i]) teamAWins++;
+    else if (ratedB[i] > ratedA[i]) teamBWins++;
+    else ties++;
+  }
+  return { teamAWins, teamBWins, matchupCount, ties };
+}
+
 function hideTeamPreview() {
   const wrap = document.getElementById('team-preview-modal');
-  if (wrap) wrap.classList.add('hidden');
+  if (wrap) { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
 }
 
 function showDivisionPreview(divisionId) {
@@ -455,6 +506,7 @@ function showDivisionPreview(divisionId) {
   const wrap = document.getElementById('division-preview-modal');
   wrap.setAttribute('data-division', divisionId);
   wrap.classList.remove('hidden');
+  wrap.classList.add('flex');
   const titleEl = document.getElementById('division-preview-name');
   const seasonEl = document.getElementById('division-preview-season');
   const body = document.getElementById('division-preview-body');
@@ -498,7 +550,7 @@ function showDivisionPreview(divisionId) {
 
 function hideDivisionPreview() {
   const wrap = document.getElementById('division-preview-modal');
-  if (wrap) wrap.classList.add('hidden');
+  if (wrap) { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
 }
 
 function renderTeams(containerId, teams, divisionId) {
@@ -914,6 +966,17 @@ async function loadTeamPerformanceChart() {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Fade out loading overlay after initial render
+  const loadingOverlay = document.getElementById('loading-overlay');
+  if (loadingOverlay) {
+    loadingOverlay.style.opacity = '0';
+    setTimeout(() => {
+      loadingOverlay.style.display = 'none';
+    }, 300);
+  }
+  const app = document.getElementById('app');
+  if (app) app.style.display = 'flex';
+
   showCollegeTab('college-dashboard');
   fetchLeagueInfo();
   setupBackButton();

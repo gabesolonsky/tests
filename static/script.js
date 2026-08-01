@@ -11,6 +11,9 @@ const RATING_TIERS = [
   { name: 'Pro', min: 6.5, max: Infinity }
 ];
 
+// Holds the current ApexCharts instance for the "Rating Over Time" chart so the reset-zoom button can control it
+let ratingChartInstance = null;
+
 // Global variables for match loading
 let currentPageForMatches = 1;
 let hasMoreMatches = true;
@@ -141,13 +144,17 @@ async function fetchAndRenderRatings(currentUserId) {
         if (highestRatingDateEl) highestRatingDateEl.textContent = highestRatingDateStr ? `(${highestRatingDateStr})` : "";
 
         const chartContainer = document.querySelector("#chart");
+        const resetZoomBtn = document.getElementById('reset-zoom-btn');
+
         if (allDivisionRatings.length === 0) {
             if (chartContainer) chartContainer.innerHTML = '<p class="text-center text-gray-500 mt-10">No ranking history available.</p>';
+            ratingChartInstance = null;
+            if (resetZoomBtn) resetZoomBtn.classList.add('hidden');
         } else {
             if (chartContainer) chartContainer.innerHTML = ''; 
-            new ApexCharts(chartContainer, {
+            ratingChartInstance = new ApexCharts(chartContainer, {
                 series: [{ name: 'Rating', data: allDivisionRatings.map(r => r.rating) }],
-                chart: { height: '100%', type: 'area', toolbar: { show: false } }, // Changed height to '100%'
+                chart: { height: '100%', type: 'area', toolbar: { show: false }, zoom: { enabled: true } }, // Changed height to '100%'
                 dataLabels: { enabled: false },
                 stroke: { curve: 'smooth' },
                 xaxis: {
@@ -161,7 +168,18 @@ async function fetchAndRenderRatings(currentUserId) {
                     type: "gradient",
                     gradient: { shadeIntensity: 1, opacityFrom: 0.6, opacityTo: 0.1 }
                 }
-            }).render();
+            });
+            await ratingChartInstance.render();
+
+            if (resetZoomBtn) {
+                resetZoomBtn.classList.remove('hidden');
+                if (!resetZoomBtn.dataset.listenerAttached) {
+                    resetZoomBtn.addEventListener('click', () => {
+                        if (ratingChartInstance) ratingChartInstance.resetSeries(true, true);
+                    });
+                    resetZoomBtn.dataset.listenerAttached = 'true';
+                }
+            }
         }
 
     } catch (error) {
@@ -755,7 +773,14 @@ async function performSearch(query) {
     const formattedQuery = query.replace(/\s/g, '+');
     const apiUrl = `/proxy/resources/res/search/${formattedQuery}`;
 
-    searchResultsContainer.innerHTML = '<div class="p-2 text-gray-500">Searching...</div>';
+    searchResultsContainer.innerHTML = `
+        <div class="flex items-center gap-2 p-3 text-gray-500 text-sm">
+            <svg class="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Searching...</span>
+        </div>`;
     searchResultsContainer.classList.remove('hidden');
 
     try {
@@ -799,11 +824,7 @@ function displaySearchResults(results) {
         // Attach click listener to load the new player's profile
         resultItem.addEventListener('click', () => {
             if (result.ObjectType === "Player" && result.ObjectId) {
-                loadPlayerProfile(result.ObjectId);
-                searchInput.value = result.ObjectName; // Populate search input with selected name
-                searchResultsContainer.classList.add('hidden'); // Hide results
-            } else {
-                console.warn("Selected result is not a player or missing ObjectId:", result);
+                window.location.href = `dashboard?userId=${result.ObjectId}`;
             }
         });
         searchResultsContainer.appendChild(resultItem);
@@ -852,17 +873,29 @@ async function loadPlayerProfile(newUserId) {
         ]);
         populateRatingTooltip(); // This doesn't depend on userId, but good to call for consistency
         await loadNextMatches(userId, userName); // Load first page of matches for the new user
+        
+        // Refresh the test record widget with new userId
+        if (typeof refreshTestRecordWidget === 'function') {
+            refreshTestRecordWidget();
+        }
     } else {
         console.error("User name not available for new profile, cannot render matches or calculate opponent rating accurately.");
         document.querySelector("#matches-container").innerHTML = '<p class="text-center text-red-500 mt-4">Could not load match history for this player.</p>';
     }
 
-    // Hide loading overlay and show the main app after all data is loaded (with minimum 3 seconds display)
+
     setTimeout(() => {
-      if (loadingOverlay) loadingOverlay.style.display = 'none';
-      const app = document.getElementById('app');
-      if (app) app.style.display = 'flex';
-    }, 3000);
+        if (loadingOverlay) {
+            loadingOverlay.style.opacity = '0';
+            setTimeout(() => {
+                loadingOverlay.style.display = 'none';
+            }, 300);
+        }
+        const app = document.getElementById('app');
+        if (app) app.style.display = 'flex';
+    }, 1500);
+
+
 }
 
 
