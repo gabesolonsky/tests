@@ -1216,7 +1216,7 @@ const MI_ICONS = {
     flame: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
     trophy: '<svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
     lock: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
-    alertCircle: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>'
+    alertCircle: '<svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>'
 };
 
 // Cache of already-fetched, already-validated insight data for a given match, keyed by match_id.
@@ -1350,7 +1350,7 @@ function renderAccessCodeGate(match, insightsData, metricsContainer, matchInsigh
             <div class="mi-lock-circle mb-4">${MI_ICONS.lock}</div>
             <h3 class="text-lg font-semibold text-gray-800 mb-1.5">Match Insights are locked</h3>
             <p class="mb-1 text-sm text-gray-500 max-w-xs mx-auto">Enter the access code to view detailed stats, game-by-game score progression, and more.</p>
-            <p class="mb-5 text-sm text-gray-500">Need a code? Call <a href="tel:${CONTACT_PHONE_NUMBER}" class="text-indigo-600 font-medium hover:underline inline-flex items-center gap-1">${CONTACT_PHONE_NUMBER}</a></p>
+            <p class="mb-5 text-sm text-gray-500">Need a code? Message <a href="tel:${CONTACT_PHONE_NUMBER}" class="text-indigo-600 font-medium hover:underline inline-flex items-center gap-1">${CONTACT_PHONE_NUMBER}</a></p>
             <div class="flex items-center justify-center gap-2 flex-wrap">
                 <input type="password" id="access-code-input" class="border border-gray-300 rounded-lg px-3 py-2.5 text-center text-lg tracking-widest w-40 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="••••" autocomplete="off">
                 <button id="submit-code-btn" class="px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Unlock</button>

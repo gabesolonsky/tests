@@ -280,8 +280,8 @@ main {
 
 /* Access code gate */
 .mi-lock-circle {
-  width: 3.5rem;
-  height: 3.5rem;
+  width: 72px;
+  height: 72px;
   border-radius: 9999px;
   background: rgba(79,70,229,0.1);
   color: #4f46e5;
@@ -289,6 +289,12 @@ main {
   align-items: center;
   justify-content: center;
   margin: 0 auto;
+}
+
+/* Access code gate */
+.mi-lock-circle svg {
+  width: 52px;
+  height: 52px;
 }
 
 /* Skeleton loading state used briefly while checking a match for insights */
