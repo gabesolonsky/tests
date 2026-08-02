@@ -266,7 +266,9 @@ async function fetchMatchStatistics(currentUserId) {
 }
 
 /**
- * Fetches opponent ratings and calculates the average.
+ * Calculates the average opponent rating using ONLY the ratings embedded in
+ * each match object (w1Rating / o1Rating). No additional API calls are made
+ * (previously this fetched /ratings-top for every opponent).
  * @param {number} matchesToConsider - The number of recent matches to analyze.
  * @param {Array} allMatches - The complete list of the user's matches.
  */
@@ -283,24 +285,15 @@ async function calculateAverageOpponentRating(matchesToConsider, allMatches) {
         return;
     }
 
+    const uid = parseInt(userId, 10);
     const recentMatches = allMatches.slice(0, matchesToConsider);
-    const ratingPromises = recentMatches.map(async (match) => {
-        const opponentId = match.wid1 === parseInt(userId) ? match.oid1 : match.wid1;
-        if (opponentId && opponentId !== -1) {
-            try {
-                const res = await fetch(`/proxy/user/${opponentId}/ratings-top`, { signal: abortController.signal });
-                if (!res.ok) return null;
-                const ratingData = await res.json();
-                return (ratingData && ratingData.length > 0 && typeof ratingData[0].rating === 'number') ? ratingData[0].rating : null;
-            } catch (e) {
-                console.error(`Could not fetch rating for opponent ${opponentId}`, e);
-                return null;
-            }
-        }
-        return null;
+    const opponentRatings = [];
+
+    recentMatches.forEach(match => {
+        const rating = getOpponentRatingFromMatch(match, uid);
+        if (!isNaN(rating)) opponentRatings.push(rating);
     });
 
-    const opponentRatings = (await Promise.all(ratingPromises)).filter(rating => rating !== null);
     if (opponentRatings.length > 0) {
         const averageRating = (opponentRatings.reduce((sum, rating) => sum + rating, 0) / opponentRatings.length).toFixed(2);
         avgOpponentRatingEl.textContent = averageRating;
@@ -358,10 +351,11 @@ async function fetchAndDisplayMonthlyRatingChanges(currentUserId, allMatches) {
             }
         }
 
-        let months = [];
-        let currentDate = new Date();
+        // Show the last 12 months (default view, no toggle button).
+        const months = [];
+        const currentDate = new Date();
         currentDate.setDate(1); // Prevent duplicate months
-        
+
         for (let i = 0; i < 12; i++) {
             months.push({
                 key: `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`,
@@ -370,10 +364,10 @@ async function fetchAndDisplayMonthlyRatingChanges(currentUserId, allMatches) {
                     year: 'numeric'
                 })
             });
-        
+
             currentDate.setMonth(currentDate.getMonth() - 1);
         }
-        
+
         let html = `<div class="mb-4 p-2 bg-gray-100 rounded-lg">${ytdChangeHtml}</div><ul class="space-y-3">`;
         months.forEach(month => {
             const monthRatings = ratingsByMonth[month.key];
@@ -417,87 +411,82 @@ async function fetchAndDisplayMonthlyRatingChanges(currentUserId, allMatches) {
 }
 
 /**
- * Optimized fetchAndDisplayTopOpponents
+ * Returns the opponent's rating embedded in the match object (no extra API call).
+ *
+ * Match schema:
+ *   wid1     -> home player's user ID
+ *   oid1     -> visiting player's user ID
+ *   w1Rating -> home player's rating
+ *   o1Rating -> visiting player's rating
+ *
+ * If the current user is the home player (wid1 === uid), the opponent is the
+ * visiting player, so we use o1Rating. If the user is the visiting player
+ * (oid1 === uid), the opponent is the home player, so we use w1Rating.
  */
-async function fetchAndDisplayTopOpponents(currentUserId, allMatches) {
-    const container = document.getElementById("top-opponents-list");
-    if (!container) return;
+function getOpponentRatingFromMatch(match, uid) {
+    if (match.wid1 === uid) return parseFloat(match.o1Rating); // user home -> opponent is visitor
+    if (match.oid1 === uid) return parseFloat(match.w1Rating); // user visiting -> opponent is home
+    return NaN;
+}
+
+/**
+ * Renders a single match card for the Top Wins/Losses by Opponent Rating
+ * widgets, showing the opponent's rating alongside the score.
+ */
+function renderTopOpponentRatingCard(match, rating, userId) {
+    const { didWin, opponentName } = getUserMatchOutcome(match, userId);
+    const resultClass = didWin ? 'win' : 'lose';
+    const score = formatMatchScoreForUser(match, didWin);
+    const date = match.MatchDate ? new Date(match.MatchDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    return `<div class="event-card ${resultClass}" data-matchid="${match.Matchid}" data-home-player-name="${match.hplayer1 || 'Home Player'}" data-visiting-player-name="${match.vplayer1 || 'Visiting Player'}">
+        <img src="https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png" class="event-logo" alt="Match" />
+        <div class="event-details">
+            <p><strong>vs. ${opponentName} (${rating.toFixed(2)})</strong></p>
+            <p>Score: ${score}</p>
+            <p class="text-xs text-gray-500">${date}</p>
+        </div>
+    </div>`;
+}
+
+/**
+ * Renders "Top Losses by Opponent Rating" using ONLY the rating data already
+ * embedded in each match object (w1Rating / o1Rating). No additional API calls
+ * are made.
+ *
+ * The user's side is determined by comparing their user ID to wid1 (home)
+ * and oid1 (visiting). The opponent's rating is the opposite side's rating:
+ *   user home (wid1 === uid)      -> opponent rating = o1Rating
+ *   user visiting (oid1 === uid)  -> opponent rating = w1Rating
+ * The winner is determined from the authoritative Winner field.
+ */
+function fetchAndDisplayTopLosses(currentUserId, allMatches) {
+    const lossesContainer = document.getElementById('top-losses-list');
+    if (!lossesContainer) return;
+
     if (!allMatches || allMatches.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-500 mt-10">No match history available.</p>';
+        lossesContainer.innerHTML = '<p class="text-center text-gray-500 mt-10">No match history available.</p>';
         return;
     }
-    container.innerHTML = '<p class="text-center text-gray-500 mt-10">Analyzing opponents...</p>';
 
-    const opponentData = new Map();
+    lossesContainer.innerHTML = '<p class="text-center text-gray-500 mt-10">Analyzing losses...</p>';
+
     const uid = parseInt(currentUserId);
+    const losses = [];
 
-    // 1. Group matches by opponent
-    allMatches.forEach(match => {
-        const opponentId = match.wid1 === uid ? match.oid1 : match.wid1;
-        const opponentName = getOpponentDisplayName(match, uid, currentUserFullName);
-        if (opponentId && opponentId !== -1 && opponentName) {
-            if (!opponentData.has(opponentId)) {
-                opponentData.set(opponentId, { name: opponentName, rating: 0, matches: [] });
-            }
-            opponentData.get(opponentId).matches.push(match);
-        }
+    (allMatches || []).forEach(match => {
+        const rating = getOpponentRatingFromMatch(match, uid);
+        if (isNaN(rating)) return; // match object has no opponent rating -> skip (no API call)
+        const didWin = didUserWinMatch(match, uid, currentUserFullName);
+        if (!didWin) losses.push({ rating, match });
     });
 
-    // 2. Filter out opponents with very few matches if the dataset is huge (Optional)
-    const opponentEntries = Array.from(opponentData.entries());
-
-    // 3. Fetch ratings in parallel with concurrency limit or Promise.all
-    // Adding a simple in-memory cache check so we never re-fetch the same opponent twice in a session
-    if (!window.opponentRatingCache) window.opponentRatingCache = new Map();
-
-    const ratingPromises = opponentEntries.map(async ([id, data]) => {
-        // Check cache first
-        if (window.opponentRatingCache.has(id)) {
-            data.rating = window.opponentRatingCache.get(id);
-            return;
-        }
-
-        try {
-            const res = await fetch(`/proxy/user/${id}/ratings-top`, { signal: abortController.signal });
-            if (!res.ok) return;
-            const ratingData = await res.json();
-            if (ratingData && ratingData.length > 0 && typeof ratingData[0].rating === 'number') {
-                const rating = ratingData[0].rating;
-                data.rating = rating;
-                window.opponentRatingCache.set(id, rating); // Save to cache
-            }
-        } catch (e) {
-            console.error(`Could not fetch rating for opponent ${id}`, e);
-        }
-    });
-
-    await Promise.all(ratingPromises);
-
-    // 4. Sort and render top 5
-    const sortedOpponents = Array.from(opponentData.values())
-        .filter(opp => opp.rating > 0)
-        .sort((a, b) => b.rating - a.rating)
-        .slice(0, 5);
-
-    if (sortedOpponents.length === 0) {
-        container.innerHTML = '<p class="text-center text-gray-500 mt-10">No opponent rating data found.</p>';
+    if (losses.length === 0) {
+        lossesContainer.innerHTML = '<p class="text-center text-gray-500 mt-10">No losses with rating data.</p>';
         return;
     }
 
-    let html = '<div class="space-y-3">';
-    sortedOpponents.forEach(opponent => {
-        const lastMatch = opponent.matches.sort((a, b) => new Date(b.MatchDate) - new Date(a.MatchDate))[0];
-        const didWin = didUserWinMatch(lastMatch, uid, currentUserFullName);
-        html += `<div class="event-card ${didWin ? "win" : "lose"}" data-matchid="${lastMatch.Matchid}" data-home-player-name="${lastMatch.hplayer1 || 'Home Player'}" data-visiting-player-name="${lastMatch.vplayer1 || 'Visiting Player'}">
-            <img src="https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png" class="event-logo" alt="Match" />
-            <div class="event-details">
-                <p><strong>vs. ${opponent.name} (${opponent.rating.toFixed(2)})</strong></p>
-                <p>Score: ${lastMatch.Score}</p>
-            </div>
-        </div>`;
-    });
-    html += '</div>';
-    container.innerHTML = html;
+    const topLosses = losses.sort((a, b) => b.rating - a.rating).slice(0, 5);
+    lossesContainer.innerHTML = `<div class="space-y-3">${topLosses.map(e => renderTopOpponentRatingCard(e.match, e.rating, currentUserId)).join('')}</div>`;
 }
 
 /**
@@ -632,10 +621,89 @@ function formatDurationSec(totalSeconds) {
  */
 
 async function fetchAdvancedMatchInsights(allMatches) {
-    return;
+    const insightIds = ['average-match-length', 'longest-match-length', 'shortest-match-length', 'average-point-length', 'longest-point-length', 'shortest-point-length'];
+    insightIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = 'Loading...';
+    });
+
+    if (!allMatches || allMatches.length === 0) {
+        insightIds.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = 'N/A';
+        });
+        return;
+    }
+
+    let matchesWithInsights = [];
+    const pointLengths = [];
+    const MIN_POINT_DURATION_SEC = 4;
+    const MAX_POINT_DURATION_SEC = 150;
+    const MIN_MATCH_DURATION_SEC = 240;
+
+    await Promise.all(allMatches.map(async (match) => {
+        try {
+            const res = await fetch(`/proxy/liveScoreDetails?match_id=${match.Matchid}`, { signal: abortController.signal });
+            if (!res.ok) return;
+            const details = await res.json();
+            if (!details || details.length < 2) return;
+            const allPoints = details.filter(evt => evt.Decision === "point").sort((a, b) => new Date(a.StartDate) - new Date(b.StartDate));
+            if (allPoints.length < 2) return;
+
+            const matchStart = new Date(allPoints[0].StartDate);
+            const matchEnd = new Date(allPoints[allPoints.length - 1].StartDate);
+            const matchDurationSec = (matchEnd - matchStart) / 1000;
+
+            if (matchDurationSec >= MIN_MATCH_DURATION_SEC) {
+                matchesWithInsights.push({ duration: matchDurationSec, match: match });
+            }
+
+            for (let i = 1; i < allPoints.length; i++) {
+                const diffSec = (new Date(allPoints[i].StartDate) - new Date(allPoints[i - 1].StartDate)) / 1000;
+                if (diffSec >= MIN_POINT_DURATION_SEC && diffSec <= MAX_POINT_DURATION_SEC) {
+                    pointLengths.push(diffSec);
+                }
+            }
+        } catch (e) { /* Silently ignore */ }
+    }));
+
+    if (matchesWithInsights.length > 0) {
+        const avgMatchLength = matchesWithInsights.reduce((a, b) => a + b.duration, 0) / matchesWithInsights.length;
+        matchesWithInsights.sort((a, b) => a.duration - b.duration);
+        const shortestMatch = matchesWithInsights[0];
+        const longestMatch = matchesWithInsights[matchesWithInsights.length - 1];
+
+        document.getElementById('average-match-length').textContent = formatDurationSec(avgMatchLength);
+        document.getElementById('longest-match-length').textContent = formatDurationSec(longestMatch.duration);
+        document.getElementById('shortest-match-length').textContent = formatDurationSec(shortestMatch.duration);
+
+        const longestEl = document.getElementById('longest-match-length');
+        const shortestEl = document.getElementById('shortest-match-length');
+        if (longestEl) longestEl.onclick = () => showGraphModal(longestMatch.match);
+        if (shortestEl) shortestEl.onclick = () => showGraphModal(shortestMatch.match);
+    } else {
+        ['average-match-length', 'longest-match-length', 'shortest-match-length'].forEach(id => document.getElementById(id).textContent = 'N/A');
+    }
+
+    if (pointLengths.length > 0) {
+        const avgPoint = pointLengths.reduce((a, b) => a + b, 0) / pointLengths.length;
+        document.getElementById('average-point-length').textContent = formatDurationSec(avgPoint);
+        document.getElementById('longest-point-length').textContent = formatDurationSec(Math.max(...pointLengths));
+        document.getElementById('shortest-point-length').textContent = formatDurationSec(Math.min(...pointLengths));
+    } else {
+        ['average-point-length', 'longest-point-length', 'shortest-point-length'].forEach(id => document.getElementById(id).textContent = 'N/A');
+    }
 }
 
 // --- START: Match Insights Modal Functions ---
+
+const TEMP_MESSAGE_ICONS = {
+    info: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
+    success: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.801 10A10 10 0 1 1 17 3.335"/><path d="m9 11 3 3L22 4"/></svg>',
+    error: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>'
+};
+let tempMessageHideTimer = null;
+let tempMessageFadeTimer = null;
 
 function showTemporaryMessage(message, type = 'info') {
     let messageBox = document.getElementById('temp-message-box');
@@ -644,25 +712,106 @@ function showTemporaryMessage(message, type = 'info') {
         messageBox.id = 'temp-message-box';
         document.body.appendChild(messageBox);
     }
-    messageBox.textContent = message;
-    messageBox.className = 'fixed top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg z-50 text-white transition-opacity duration-300';
-    if (type === 'info') messageBox.classList.add('bg-blue-500');
+    clearTimeout(tempMessageHideTimer);
+    clearTimeout(tempMessageFadeTimer);
+
+    const icon = TEMP_MESSAGE_ICONS[type] || TEMP_MESSAGE_ICONS.info;
+    messageBox.innerHTML = `${icon}<span>${message}</span>`;
+    messageBox.className = 'fixed top-4 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-lg shadow-lg z-[70] text-white transition-opacity duration-300';
+    if (type === 'info') messageBox.classList.add('bg-indigo-600');
     else if (type === 'success') messageBox.classList.add('bg-green-500');
     else if (type === 'error') messageBox.classList.add('bg-red-500');
-    messageBox.style.display = 'block';
+    messageBox.style.display = 'flex';
+    void messageBox.offsetWidth;
     setTimeout(() => messageBox.style.opacity = '1', 10);
-    setTimeout(() => {
+    tempMessageFadeTimer = setTimeout(() => {
         messageBox.style.opacity = '0';
-        setTimeout(() => messageBox.style.display = 'none', 500);
+        tempMessageHideTimer = setTimeout(() => messageBox.style.display = 'none', 300);
     }, 3000);
 }
+
+// Icons used inside the match insights modal (kept inline so no extra requests are needed)
+const MI_ICONS = {
+    activity: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+    x: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+    grid: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>',
+    clock: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    zap: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/></svg>',
+    flame: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
+    trophy: '<svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>',
+    lock: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    alertCircle: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>'
+};
 
 function closeGraphModal() {
     const graphModal = document.getElementById("graph-modal");
     if (graphModal) {
         graphModal.classList.add("hidden");
+        graphModal.classList.remove("mi-open");
         graphModal.style.display = "none";
+        document.body.classList.remove('no-scroll');
     }
+}
+
+// Cache of already-fetched, already-validated insight data for a given match, keyed by match_id.
+const matchInsightsDataCache = new Map();
+
+/**
+ * Simple placeholder UI shown the instant the modal opens, while we check
+ * whether this match actually has insight data to show.
+ */
+function renderInsightsLoadingSkeleton() {
+    return `
+        <div class="py-6">
+            <div class="mi-skeleton h-6 w-40 mx-auto mb-4"></div>
+            <div class="flex justify-center gap-3 mb-6 flex-wrap">
+                <div class="mi-skeleton h-14 w-32 rounded-xl"></div>
+                <div class="mi-skeleton h-14 w-32 rounded-xl"></div>
+                <div class="mi-skeleton h-14 w-32 rounded-xl"></div>
+                <div class="mi-skeleton h-14 w-32 rounded-xl"></div>
+            </div>
+            <div class="mi-skeleton h-56 w-full max-w-xl mx-auto"></div>
+        </div>
+    `;
+}
+
+/**
+ * Fetches and validates the raw live-scoring data for a match.
+ * Returns a processed object (allPoints, gameMap, uniqueGames) when the match
+ * has usable scoring data, or null when there's nothing worth showing.
+ * This never touches the DOM/modal — callers decide what to do with the result.
+ */
+async function fetchMatchInsightsData(match) {
+    const match_id = match.Matchid || match.matchId;
+
+    if (matchInsightsDataCache.has(match_id)) {
+        return matchInsightsDataCache.get(match_id);
+    }
+
+    let data;
+    try {
+        const response = await fetch(`/proxy/liveScoreDetails?match_id=${match_id}`, { signal: abortController.signal });
+        if (!response.ok) throw new Error("Proxy response not ok");
+        data = await response.json();
+    } catch (error) {
+        return null;
+    }
+
+    if (!data || data.length < 2) return null;
+
+    const allPoints = data.filter(evt => evt.Decision === "point").sort((a, b) => new Date(a.StartDate) - new Date(b.StartDate));
+    if (allPoints.length < 2) return null;
+
+    const gameMap = {};
+    allPoints.forEach(evt => {
+        if (!gameMap[evt.Game_Number]) gameMap[evt.Game_Number] = [];
+        gameMap[evt.Game_Number].push(evt);
+    });
+    const uniqueGames = Object.keys(gameMap).map(g => parseInt(g)).sort((a, b) => a - b);
+
+    const result = { allPoints, gameMap, uniqueGames };
+    matchInsightsDataCache.set(match_id, result);
+    return result;
 }
 
 async function showGraphModal(match) {
@@ -673,88 +822,122 @@ async function showGraphModal(match) {
     }
     const graphModal = document.getElementById("graph-modal");
     if (!graphModal) return;
-    
+
     const metricsContainer = graphModal.querySelector("#metrics-container");
     const matchInsightsTitle = graphModal.querySelector("#match-insights-title");
-    metricsContainer.innerHTML = '';
+    const matchInsightsIcon = graphModal.querySelector("#match-insights-icon");
+
+    // Open the modal right away with a loading state.
+    metricsContainer.innerHTML = renderInsightsLoadingSkeleton();
+    if (matchInsightsIcon) matchInsightsIcon.innerHTML = MI_ICONS.activity;
+    if (matchInsightsTitle) matchInsightsTitle.textContent = 'Match Insights';
     graphModal.classList.remove("hidden");
+    graphModal.classList.add("mi-open");
     graphModal.style.display = "flex";
+    document.body.classList.add('no-scroll');
+
+    const insightsData = await fetchMatchInsightsData(match);
+    if (!insightsData) {
+        // No insights for this match — automatically close the modal back out
+        // and just tell the person via the toast instead of leaving it open empty.
+        closeGraphModal();
+        showTemporaryMessage("No match insights available for this match yet.", "info");
+        return;
+    }
 
     if (sessionStorage.getItem(SESSION_STORAGE_KEY_MATCH_INSIGHTS) === 'true') {
         if (matchInsightsTitle) matchInsightsTitle.textContent = 'Match Insights';
-        await loadMatchInsights(match, metricsContainer);
+        renderMatchInsights(match, insightsData, metricsContainer);
         return;
     }
 
     if (matchInsightsTitle) matchInsightsTitle.textContent = 'Enter Access Code';
-    metricsContainer.innerHTML = `<div id="code-input-area" class="text-center p-4"><p class="mb-4 text-gray-700">Please enter the access code to view detailed match insights.</p><p class="mb-4 text-gray-700">For more details, please contact <a href="tel:${CONTACT_PHONE_NUMBER}" class="text-indigo-600 hover:underline">${CONTACT_PHONE_NUMBER}</a>.</p><input type="password" id="access-code-input" class="border border-gray-300 rounded-md p-2 text-center text-lg w-48 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter code"><button id="submit-code-btn" class="ml-3 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">Submit</button><p id="code-error-message" class="text-red-500 text-sm mt-2 hidden">Incorrect code.</p></div>`;
-    
+    renderAccessCodeGate(match, insightsData, metricsContainer, matchInsightsTitle);
+}
+
+/**
+ * Renders the "enter access code" gate inside the metrics container.
+ * On success it hands off to renderMatchInsights using the already-fetched data.
+ */
+function renderAccessCodeGate(match, insightsData, metricsContainer, matchInsightsTitle) {
+    metricsContainer.innerHTML = `
+        <div id="code-input-area" class="text-center py-8 px-4">
+            <div class="mi-lock-circle mb-4">${MI_ICONS.lock}</div>
+            <h3 class="text-lg font-semibold text-gray-800 mb-1.5">Match Insights are locked</h3>
+            <p class="mb-1 text-sm text-gray-500 max-w-xs mx-auto">Enter the access code to view detailed stats, game-by-game score progression, and more.</p>
+            <p class="mb-5 text-sm text-gray-500">Need a code? Call <a href="tel:${CONTACT_PHONE_NUMBER}" class="text-indigo-600 font-medium hover:underline">${CONTACT_PHONE_NUMBER}</a></p>
+            <div class="flex items-center justify-center gap-2 flex-wrap">
+                <input type="password" id="access-code-input" class="border border-gray-300 rounded-lg px-3 py-2.5 text-center text-lg tracking-widest w-40 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" placeholder="••••" autocomplete="off">
+                <button id="submit-code-btn" class="px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Unlock</button>
+            </div>
+            <p id="code-error-message" class="flex items-center justify-center gap-1.5 text-red-500 text-sm mt-3 hidden">${MI_ICONS.alertCircle}<span>Incorrect code. Please try again.</span></p>
+        </div>
+    `;
+
     const accessCodeInput = document.getElementById('access-code-input');
     const submitCodeBtn = document.getElementById('submit-code-btn');
-    const handleCodeSubmission = async () => {
+    const codeErrorMessage = document.getElementById('code-error-message');
+    const codeInputArea = document.getElementById('code-input-area');
+
+    const handleCodeSubmission = () => {
         if (accessCodeInput.value === MATCH_INSIGHTS_ACCESS_CODE) {
             sessionStorage.setItem(SESSION_STORAGE_KEY_MATCH_INSIGHTS, 'true');
             if (matchInsightsTitle) matchInsightsTitle.textContent = 'Match Insights';
-            await loadMatchInsights(match, metricsContainer);
+            renderMatchInsights(match, insightsData, metricsContainer);
         } else {
-            document.getElementById('code-error-message').classList.remove('hidden');
+            if (codeErrorMessage) codeErrorMessage.classList.remove('hidden');
+            if (codeInputArea) {
+                codeInputArea.classList.remove('mi-shake');
+                void codeInputArea.offsetWidth;
+                codeInputArea.classList.add('mi-shake');
+            }
             accessCodeInput.value = '';
+            accessCodeInput.focus();
         }
     };
     submitCodeBtn.addEventListener("click", handleCodeSubmission);
     accessCodeInput.addEventListener("keypress", (e) => { if (e.key === 'Enter') handleCodeSubmission(); });
+    accessCodeInput.focus();
 }
 
-async function loadMatchInsights(match, container) {
-    const match_id = match.Matchid || match.matchId;
-    container.innerHTML = '<p class="text-center text-gray-500 mt-10">Loading match insights...</p>';
-    
-    let data;
-    try {
-        const response = await fetch(`/proxy/liveScoreDetails?match_id=${match_id}`, { signal: abortController.signal });
-        if (!response.ok) throw new Error("Proxy response not ok");
-        data = await response.json();
-    } catch (error) {
-        showTemporaryMessage("No live scoring available for this match.", "info");
-        container.innerHTML = ''; return;
-    }
-
-    if (!data || data.length < 2) {
-        showTemporaryMessage("No live scoring available for this match.", "info");
-        container.innerHTML = ''; return;
-    }
-    
-    const allPoints = data.filter(evt => evt.Decision === "point").sort((a, b) => new Date(a.StartDate) - new Date(b.StartDate));
-    if (allPoints.length < 2) {
-        showTemporaryMessage("No live scoring available for this match.", "info");
-        container.innerHTML = ''; return;
-    }
-    
+/**
+ * Renders the full Match Insights UI (score card, stat chips, charts, game tabs)
+ * into the given container using data that was already fetched & validated.
+ */
+function renderMatchInsights(match, insightsData, container) {
+    const { allPoints, gameMap, uniqueGames } = insightsData;
     const homePlayerName = match.playerHome1Name || match.hplayer1 || "Home Player";
     const visitingPlayerName = match.playerVisiting1Name || match.vplayer1 || "Visiting Player";
-    
-    container.innerHTML = `<div id="tab-nav" class="flex justify-center border-b border-gray-200 mb-4"></div><div id="tab-content" class="p-4"></div>`;
+
+    container.innerHTML = `<div id="tab-nav" class="mi-tab-nav mb-4"></div><div id="tab-content" class="px-1 pb-2"></div>`;
     const tabNav = container.querySelector("#tab-nav");
     const tabContent = container.querySelector("#tab-content");
 
-    const gameMap = {};
-    allPoints.forEach(evt => {
-        if (!gameMap[evt.Game_Number]) gameMap[evt.Game_Number] = [];
-        gameMap[evt.Game_Number].push(evt);
-    });
-    const uniqueGames = Object.keys(gameMap).map(g => parseInt(g)).sort((a,b) => a - b);
+    function makeStatCard(icon, label, value) {
+        return `
+            <div class="mi-stat-card">
+                <div class="mi-stat-icon">${icon}</div>
+                <div class="min-w-0">
+                    <div class="mi-stat-label">${label}</div>
+                    <div class="mi-stat-value truncate">${value}</div>
+                </div>
+            </div>`;
+    }
 
     // --- Overview Tab Setup ---
     const overviewTabBtn = document.createElement("button");
-    overviewTabBtn.textContent = "Overview";
-    overviewTabBtn.className = "tab-button py-2 px-4 text-sm font-medium text-gray-600 hover:text-indigo-600 focus:outline-none border-b-2 border-transparent";
+    overviewTabBtn.innerHTML = `<span class="mi-tab-icon">${MI_ICONS.grid}</span>Overview`;
+    overviewTabBtn.className = "mi-tab-btn";
     tabNav.appendChild(overviewTabBtn);
 
     const overviewContent = document.createElement("div");
     overviewContent.className = "tab-content-pane";
     overviewContent.style.display = "block";
     tabContent.appendChild(overviewContent);
+
     
+    
+
     // --- Overview Calculations ---
     let homeGamesWon = 0, visitingGamesWon = 0;
     const homeGameScores = [], visitingGameScores = [], gameLabels = [];
@@ -775,7 +958,7 @@ async function loadMatchInsights(match, container) {
     const pointDurations = [];
     for(let i = 1; i < allPoints.length; i++) {
         const diffSec = (new Date(allPoints[i].StartDate) - new Date(allPoints[i-1].StartDate)) / 1000;
-        if(diffSec > 0 && diffSec < 150) { // Using 150s max as per outlier rules
+        if(diffSec > 0 && diffSec < 150) {
             pointDurations.push(diffSec);
             if(diffSec > longestPointSec) longestPointSec = diffSec;
         }
@@ -784,62 +967,123 @@ async function loadMatchInsights(match, container) {
     const averageGameSec = gameLengthsSec.length > 0 ? gameLengthsSec.reduce((a, b) => a + b, 0) / gameLengthsSec.length : 0;
 
     // --- Render Overview Content ---
-    function makeStatBox(label, value) {
-        return `<div class="bg-gray-50 p-3 rounded-lg shadow-sm text-center min-w-[120px]"><strong class="block text-gray-600 text-sm">${label}:</strong> <span class="text-lg font-semibold text-indigo-700">${value}</span></div>`;
-    }
     overviewContent.innerHTML = `
-        <div class="mb-4 text-center">
-            <h3 class="text-lg font-semibold mb-2">Match Score</h3>
-            <p class="text-2xl font-bold">${homePlayerName} <span class="text-red-500">${homeGamesWon}</span> - <span class="text-blue-500">${visitingGamesWon}</span> ${visitingPlayerName}</p>
+        <div class="mi-score-card mb-4 text-center">
+            <div class="flex items-center justify-center gap-2 mb-1 text-indigo-500">${MI_ICONS.trophy}<span class="text-xs font-semibold uppercase tracking-wide">Match Score</span></div>
+            <p class="text-xl sm:text-2xl font-bold flex items-center justify-center gap-2 flex-wrap">
+                <span class="mi-player-pill">${homePlayerName}</span>
+                <span class="text-red-500">${homeGamesWon}</span>
+                <span class="text-gray-300">–</span>
+                <span class="text-blue-500">${visitingGamesWon}</span>
+                <span class="mi-player-pill">${visitingPlayerName}</span>
+            </p>
         </div>
-        <div class="flex justify-center gap-4 mb-6 flex-wrap">
-            ${makeStatBox("Match Length", formatDurationSec(matchLengthSec))}
-            ${makeStatBox("Avg Point", formatDurationSec(averagePointSec))}
-            ${makeStatBox("Longest Point", formatDurationSec(longestPointSec))}
-            ${makeStatBox("Avg Game", formatDurationSec(averageGameSec))}
+        <div class="flex justify-center gap-3 mb-6 flex-wrap">
+            ${makeStatCard(MI_ICONS.clock, "Match Length", formatDurationSec(matchLengthSec))}
+            ${makeStatCard(MI_ICONS.zap, "Avg Point", formatDurationSec(averagePointSec))}
+            ${makeStatCard(MI_ICONS.flame, "Longest Point", formatDurationSec(longestPointSec))}
+            ${makeStatCard(MI_ICONS.clock, "Avg Game", formatDurationSec(averageGameSec))}
         </div>
         <div class="max-w-xl mx-auto"><canvas id="game-scores-bar-chart"></canvas></div>
     `;
 
     new Chart(document.getElementById('game-scores-bar-chart').getContext('2d'), {
         type: 'bar',
-        data: { labels: gameLabels, datasets: [{ label: homePlayerName, data: homeGameScores, backgroundColor: 'rgba(239, 68, 68, 0.8)' }, { label: visitingPlayerName, data: visitingGameScores, backgroundColor: 'rgba(59, 130, 246, 0.8)' }] },
+        data: { labels: gameLabels, datasets: [{ label: homePlayerName, data: homeGameScores, backgroundColor: 'rgba(239, 68, 68, 0.8)', borderRadius: 6 }, { label: visitingPlayerName, data: visitingGameScores, backgroundColor: 'rgba(99, 102, 241, 0.8)', borderRadius: 6 }] },
         options: { responsive: true, plugins: { title: { display: true, text: 'Game Scores' } } }
     });
 
     // --- Create Game Tabs ---
     uniqueGames.forEach(gameNum => {
         const gameTabBtn = document.createElement("button");
-        gameTabBtn.textContent = `Game ${gameNum}`;
-        gameTabBtn.className = "tab-button py-2 px-4 text-sm font-medium text-gray-600 hover:text-indigo-600 focus:outline-none border-b-2 border-transparent";
+        gameTabBtn.innerHTML = `<span class="mi-tab-icon">${MI_ICONS.activity}</span>Game ${gameNum}`;
+        gameTabBtn.className = "mi-tab-btn";
         tabNav.appendChild(gameTabBtn);
         const gameContent = document.createElement("div");
         gameContent.className = "tab-content-pane";
         gameContent.style.display = "none";
-        gameContent.innerHTML = `<div class="max-w-xl mx-auto" style="height: 350px;"><canvas id="game-chart-${gameNum}"></canvas></div>`;
         tabContent.appendChild(gameContent);
         const pointsGame = gameMap[gameNum].sort((a, b) => new Date(a.StartDate) - new Date(b.StartDate));
-        new Chart(document.getElementById(`game-chart-${gameNum}`).getContext('2d'), {
+
+        // --- Per-Game Stats (mirrors script.js game tab) ---
+        const MAX_POINT_DURATION_SEC = 120; // 2 minutes
+        const finalLeft = pointsGame[pointsGame.length - 1].Points_left;
+        const finalRight = pointsGame[pointsGame.length - 1].Points_right;
+        const start = new Date(pointsGame[0].StartDate);
+        const end = new Date(pointsGame[pointsGame.length - 1].StartDate);
+        const gameLengthSec = (end - start) / 1000;
+
+        const intervals = [];
+        let longestPointSecGame = 0;
+        for (let i = 1; i < pointsGame.length; i++) {
+            const diffSec = (new Date(pointsGame[i].StartDate) - new Date(pointsGame[i - 1].StartDate)) / 1000;
+            if (diffSec <= MAX_POINT_DURATION_SEC) {
+                intervals.push(diffSec);
+                if (diffSec > longestPointSecGame) longestPointSecGame = diffSec;
+            }
+        }
+        const avgPointSecGame = intervals.length ? intervals.reduce((a, b) => a + b, 0) / intervals.length : 0;
+
+        gameContent.innerHTML = `
+            <div class="mi-score-card mb-4 text-center">
+                <div class="text-xs font-semibold uppercase tracking-wide text-indigo-500 mb-1">Final Score · Game ${gameNum}</div>
+                <p class="text-xl font-bold mb-3"><span class="text-red-500">${homePlayerName}</span> ${finalLeft} &ndash; ${finalRight} <span class="text-blue-500">${visitingPlayerName}</span></p>
+                <div class="flex justify-center gap-3 flex-wrap">
+                    ${makeStatCard(MI_ICONS.clock, "Game Length", formatDurationSec(gameLengthSec))}
+                    ${makeStatCard(MI_ICONS.zap, "Avg Point", formatDurationSec(avgPointSecGame))}
+                    ${makeStatCard(MI_ICONS.flame, "Longest Point", formatDurationSec(longestPointSecGame))}
+                </div>
+            </div>
+            <div style="max-height: 350px;"><canvas id="game-chart-${gameNum}"></canvas></div>
+        `;
+
+        const x = pointsGame.map(evt => evt.Points_left + evt.Points_right);
+        const p1_scores = pointsGame.map(evt => evt.Points_left);
+        const p2_scores = pointsGame.map(evt => evt.Points_right);
+        const lineCanvas = gameContent.querySelector(`#game-chart-${gameNum}`);
+        lineCanvas.style.maxWidth = "100%";
+        lineCanvas.style.maxHeight = "350px";
+
+        new Chart(lineCanvas.getContext('2d'), {
             type: 'line',
-            data: { labels: pointsGame.map((_, i) => i + 1), datasets: [{ label: homePlayerName, data: pointsGame.map(p => p.Points_left), borderColor: 'rgb(239, 68, 68)', tension: 0.1 }, { label: visitingPlayerName, data: pointsGame.map(p => p.Points_right), borderColor: 'rgb(59, 130, 246)', tension: 0.1 }] },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: `Game ${gameNum} Progression` } } }
+            data: {
+                labels: x,
+                datasets: [
+                    { label: homePlayerName, data: p1_scores, borderColor: 'rgb(239, 68, 68)', backgroundColor: 'rgba(239, 68, 68, 0.2)', fill: true, tension: 0.3, pointStyle: 'circle', pointRadius: 5, pointHoverRadius: 7, borderWidth: 2 },
+                    { label: visitingPlayerName, data: p2_scores, borderColor: 'rgb(99, 102, 241)', backgroundColor: 'rgba(99, 102, 241, 0.2)', fill: true, tension: 0.3, pointStyle: 'circle', pointRadius: 5, pointHoverRadius: 7, borderWidth: 2 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: true, position: 'top', labels: { color: '#333' } },
+                    title: { display: true, text: `Game ${gameNum} Score Progression`, color: '#333', font: { size: 16 } }
+                },
+                scales: {
+                    x: { type: 'linear', title: { display: true, text: 'Total Points Played in Game', color: '#333' }, ticks: { stepSize: 1, color: '#333' }, grid: { color: 'rgba(0,0,0,0.1)', drawBorder: false } },
+                    y: { beginAtZero: true, title: { display: true, text: 'Score', color: '#333' }, ticks: { color: '#333' }, grid: { color: 'rgba(0,0,0,0.1)', drawBorder: false } }
+                }
+            }
         });
+        
         gameTabBtn.addEventListener("click", () => {
             tabContent.querySelectorAll(".tab-content-pane").forEach(p => p.style.display = "none");
-            tabNav.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active", "border-indigo-500", "text-indigo-600"));
+            tabNav.querySelectorAll(".mi-tab-btn").forEach(b => b.classList.remove("mi-active"));
             gameContent.style.display = "block";
-            gameTabBtn.classList.add("active", "border-indigo-500", "text-indigo-600");
+            gameTabBtn.classList.add("mi-active");
         });
     });
 
     overviewTabBtn.addEventListener("click", () => {
         tabContent.querySelectorAll(".tab-content-pane").forEach(p => p.style.display = "none");
-        tabNav.querySelectorAll(".tab-button").forEach(b => b.classList.remove("active", "border-indigo-500", "text-indigo-600"));
+        tabNav.querySelectorAll(".mi-tab-btn").forEach(b => b.classList.remove("mi-active"));
         overviewContent.style.display = "block";
-        overviewTabBtn.classList.add("active", "border-indigo-500", "text-indigo-600");
+        overviewTabBtn.classList.add("mi-active");
     });
     overviewTabBtn.click();
 }
+
 
 
 // --- START: Shared Match Card / Match List Modal Helpers ---
@@ -1033,77 +1277,108 @@ function renderStreaks(container, streaks) {
         </div>
         <div class="flex justify-between items-center p-2">
             <span class="text-gray-600">Highest Win Streak</span>
-            <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">${streaks.highestWinStreak}</span>
+            <span id="streak-highest-win" class="stat-clickable px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold cursor-pointer hover:bg-green-200 transition-colors" data-stat-type="highest-win-streak">${streaks.highestWinStreak}</span>
         </div>
         <div class="flex justify-between items-center p-2">
             <span class="text-gray-600">Highest Loss Streak</span>
-            <span class="px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold">${streaks.highestLossStreak}</span>
+            <span id="streak-highest-loss" class="stat-clickable px-2 py-1 rounded-full bg-red-100 text-red-700 text-xs font-semibold cursor-pointer hover:bg-red-200 transition-colors" data-stat-type="highest-loss-streak">${streaks.highestLossStreak}</span>
         </div>
     `;
 }
+/**
+ * Determines whether a match is a "comeback win" using the exact game
+ * progression from the user's perspective (best-of-5, first to 3 games):
+ *
+ *   L W W W   (lost game 1, then won the next 3)
+ *   L L W W W (lost the first 2 games, then won the next 3)
+ *   W L L W W (won game 1, lost games 2-3, then won games 4-5)
+ *   L W L W W (lost game 1, won game 2, lost game 3, then won games 4-5)
+ *
+ * Only completed matches (Status 'C' or 'RE', mirroring script.js's
+ * isRenderableCompletedMatch) are considered. The winner is resolved with the
+ * authoritative didUserWinMatch (Winner field "H"/"V" takes priority, with
+ * name-based home/visiting resolution), so corrected/disputed records and
+ * forfeits (e.g. Status 'DF', "0-11,0-11,0-11") are handled correctly.
+ */
+function isComebackWin(match, uid, userFullName) {
+    const status = match.Status ? String(match.Status).toUpperCase() : '';
+    if (status !== 'C' && status !== 'RE') return false;
+
+    const didWin = didUserWinMatch(match, uid, userFullName);
+    if (!didWin) return false;
+
+    if (!match.Score) return false;
+
+    const games = String(match.Score).split(',').map(g => g.trim()).filter(Boolean);
+    if (games.length < 3 || games.length > 5) return false; // best-of-5
+
+    const sequence = games.map(g => {
+        const parts = g.split('-').map(n => parseInt(n, 10));
+        if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return null;
+        // The match winner's per-game score is always listed FIRST in match.Score
+        const userScore = didWin ? parts[0] : parts[1];
+        const oppScore = didWin ? parts[1] : parts[0];
+        if (userScore === oppScore) return null;
+        return userScore > oppScore ? 'W' : 'L';
+    });
+
+    if (sequence.includes(null)) return false;
+    const seq = sequence.join('');
+
+    // Exact comeback patterns only
+    return seq === 'LWWW' || seq === 'LLWWW' || seq === 'WLLWW' || seq === 'LWLWW';
+}
+
+/**
+ * Legacy alias for isComebackWin.
+ */
 function isComeback(match, userId) {
-    const uid = parseInt(userId, 10);
-
-    // Must have score and must have won the match
-    if (!match.Score || match.wid1 !== uid) return false;
-
-    // Parse games: "11-7 6-11 11-9" → [[11,7],[6,11],[11,9]]
-    const games = match.Score.split(/\s+/)
-        .map(g => g.split('-').map(Number))
-        .filter(arr => arr.length === 2);
-
-    if (games.length === 0) return false;
-
-    // Determine if user is home or visiting
-    const userIsHome = match.hid === uid;
-
-    // Check game 1
-    const [g1h, g1v] = games[0];
-    const userLostGame1 = userIsHome ? g1h < g1v : g1v < g1h;
-
-    // Check game 2 (if exists)
-    let userLostGame2 = false;
-    if (games.length > 1) {
-        const [g2h, g2v] = games[1];
-        userLostGame2 = userIsHome ? g2h < g2v : g2v < g2h;
-    }
-
-    // Comeback = lost game 1 OR lost game 2
-    return userLostGame1 || userLostGame2;
+    return isComebackWin(match, parseInt(userId, 10), currentUserFullName);
 }
 
 /**
  * Renders the Comeback Tracker widget inside the specified container.
+ *
+ * Shows four stats:
+ *   - Comeback Wins        : wins after trailing in games (clickable -> list)
+ *   - Comeback Win %       : Comeback Wins ÷ Matches Where You Trailed
+ *   - Reverse Sweeps       : wins from 0-2 down (LLWWW)
+ *   - Reverse Sweep %      : Reverse Sweeps ÷ Matches Trailing 0-2
  */
 function renderComebackTracker(container, stats, userId) {
     if (!container) return;
-    
-    if (!stats.comebackMatches || stats.comebackMatches.length === 0) {
-        container.innerHTML = `
-            <p class="text-center text-gray-500 mt-10">No comeback wins yet.</p>
-            <p class="text-xs text-center text-gray-400 mt-2">A comeback is a match you won after falling behind in games.</p>
-        `;
-        return;
-    }
+
+    const noComebacks = !stats.comebackMatches || stats.comebackMatches.length === 0;
 
     container.innerHTML = `
+        ${noComebacks ? '' : `
         <div id="comeback-count-trigger" class="flex justify-between items-center p-3 rounded-xl bg-indigo-100 cursor-pointer hover:bg-indigo-200 transition-colors">
             <span class="font-medium text-gray-700">Comeback Wins</span>
             <span class="text-lg font-bold text-indigo-600">${stats.totalComebacks}</span>
-        </div>
-        <div class="grid grid-cols-2 gap-2 pt-2">
+        </div>`}
+        <div class="grid grid-cols-2 gap-2 ${noComebacks ? '' : 'pt-2'}">
             <div class="bg-gray-100 p-3 rounded-xl text-center border border-gray-200">
-                <p class="text-xs text-gray-500 font-medium">Down 1 Game</p>
-                <p class="text-lg font-bold text-indigo-600 mt-1">${stats.down1Rate}%</p>
-                <p class="text-[10px] text-gray-500">${stats.down1Wins}/${stats.down1Opportunities} won</p>
+                <p class="text-xs text-gray-500 font-medium">Comeback Win %</p>
+                <p class="text-lg font-bold text-indigo-600 mt-1">${stats.comebackWinRate}%</p>
+                <p class="text-[10px] text-gray-500">${stats.totalComebacks}/${stats.trailingMatches} won when trailing</p>
             </div>
             <div class="bg-gray-100 p-3 rounded-xl text-center border border-gray-200">
-                <p class="text-xs text-gray-500 font-medium">Down 2 Games</p>
-                <p class="text-lg font-bold text-indigo-600 mt-1">${stats.down2Rate}%</p>
-                <p class="text-[10px] text-gray-500">${stats.down2Wins}/${stats.down2Opportunities} won</p>
+                <p class="text-xs text-gray-500 font-medium">Reverse Sweeps</p>
+                <p class="text-lg font-bold text-indigo-600 mt-1">${stats.reverseSweeps}</p>
+                <p class="text-[10px] text-gray-500">Won from 0-2 down</p>
+            </div>
+            <div class="bg-gray-100 p-3 rounded-xl text-center border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium">Reverse Sweep %</p>
+                <p class="text-lg font-bold text-indigo-600 mt-1">${stats.reverseSweepRate}%</p>
+                <p class="text-[10px] text-gray-500">${stats.reverseSweeps}/${stats.trailing0_2Matches} won from 0-2</p>
+            </div>
+            <div class="bg-gray-100 p-3 rounded-xl text-center border border-gray-200">
+                <p class="text-xs text-gray-500 font-medium">Trailing Matches</p>
+                <p class="text-lg font-bold text-indigo-600 mt-1">${stats.trailingMatches}</p>
+                <p class="text-[10px] text-gray-500">Opportunities to come back</p>
             </div>
         </div>
-        <p class="text-xs text-gray-500 mt-2 text-center">Tap Comeback Wins to view matches.</p>
+        <p class="text-xs text-gray-500 mt-2 text-center">${noComebacks ? 'No comeback wins yet — a comeback is a win after trailing in games.' : 'Tap Comeback Wins to view matches.'}</p>
     `;
 
     const trigger = container.querySelector('#comeback-count-trigger');
@@ -1116,7 +1391,7 @@ function renderComebackTracker(container, stats, userId) {
 
 
 function setupModalListeners() {
-    const containers = [ document.getElementById('top-opponents-list'), document.getElementById('last-match-details'), document.getElementById('match-list-body') ];
+    const containers = [ document.getElementById('top-losses-list'), document.getElementById('last-match-details'), document.getElementById('match-list-body') ];
     containers.forEach(container => {
         if (container) {
             container.addEventListener('click', (event) => {
@@ -1144,25 +1419,127 @@ function setupModalListeners() {
     if (matchListModal) matchListModal.addEventListener("click", (e) => { if (e.target === matchListModal) closeMatchListModal(); });
 }
 
+/**
+ * Wires up the clickable stat badges in the Match Statistics and Streaks cards.
+ * Each badge carries a data-stat-type that maps to a filter over allMatches.
+ * @param {Array} allMatches - The complete list of the user's matches.
+ * @param {string|number} currentUserId - The user's id.
+ */
+function setupMatchStatClickListeners(allMatches, currentUserId) {
+    const uid = parseInt(currentUserId, 10);
+    const container = document.getElementById('app');
+
+    if (!container) return;
+
+    // Delegate clicks on any .stat-clickable badge
+    container.addEventListener('click', (event) => {
+        const badge = event.target.closest('.stat-clickable');
+        if (!badge) return;
+
+        const type = badge.getAttribute('data-stat-type');
+        if (!type) return;
+
+        let filteredMatches = [];
+        let title = 'Matches';
+
+        switch (type) {
+            case 'wins':
+                filteredMatches = (allMatches || []).filter(m => didUserWinMatch(m, uid, currentUserFullName));
+                title = 'Wins';
+                break;
+            case 'losses':
+                filteredMatches = (allMatches || []).filter(m => !didUserWinMatch(m, uid, currentUserFullName));
+                title = 'Losses';
+                break;
+            case 'wins-3':
+            case 'wins-4':
+            case 'wins-5': {
+                const gameCount = parseInt(type.split('-')[1], 10);
+                filteredMatches = (allMatches || []).filter(m => {
+                    if (!didUserWinMatch(m, uid, currentUserFullName)) return false;
+                    const games = (m.Score || '').split(',').filter(g => g.trim() !== '');
+                    return games.length === gameCount;
+                });
+                title = `${gameCount}-Game Wins`;
+                break;
+            }
+            case 'losses-3':
+            case 'losses-4':
+            case 'losses-5': {
+                const gameCount = parseInt(type.split('-')[1], 10);
+                filteredMatches = (allMatches || []).filter(m => {
+                    if (didUserWinMatch(m, uid, currentUserFullName)) return false;
+                    const games = (m.Score || '').split(',').filter(g => g.trim() !== '');
+                    return games.length === gameCount;
+                });
+                title = `${gameCount}-Game Losses`;
+                break;
+            }
+            case 'highest-win-streak':
+            case 'highest-loss-streak': {
+                const wantWins = type === 'highest-win-streak';
+                const sorted = (allMatches || [])
+                    .filter(m => (m.wid1 === uid || m.oid1 === uid) && m.MatchDate)
+                    .sort((a, b) => new Date(a.MatchDate) - new Date(b.MatchDate));
+
+                let longest = [];
+                let run = [];
+
+                sorted.forEach(m => {
+                    const won = didUserWinMatch(m, uid, currentUserFullName);
+                    const inRun = wantWins ? won : !won;
+                    if (inRun) {
+                        run.push(m);
+                    } else {
+                        if (run.length > longest.length) longest = run.slice();
+                        run = [];
+                    }
+                });
+                if (run.length > longest.length) longest = run.slice();
+
+                filteredMatches = longest;
+                title = `Longest ${wantWins ? 'Win' : 'Loss'} Streak`;
+                break;
+            }
+            default:
+                return;
+        }
+
+        showMatchListModal(title, filteredMatches, currentUserId);
+    });
+}
+
 
 // --- END: Match Insights Modal Functions ---
 
 /**
- * Evaluates match comeback metrics: total comeback wins, 
- * wins after being down 1 game, and wins after being down 2 games.
+ * Evaluates match comeback metrics:
+ *   - Comeback Wins        : wins after trailing in games
+ *   - Comeback Win %       : Comeback Wins ÷ Matches Where You Trailed
+ *   - Reverse Sweeps       : wins from 0-2 down (LLWWW)
+ *   - Reverse Sweep %      : Reverse Sweeps ÷ Matches Trailing 0-2
+ *
+ * "Trailed" means the user was behind 0-1, 0-2, or 1-2 in games at some
+ * point in the match. Only completed matches (Status 'C' / 'RE', mirroring
+ * script.js isRenderableCompletedMatch) are considered, so forfeits and
+ * default wins (e.g. Status 'DF', "0-11,0-11,0-11") are excluded.
  */
 function computeComebackStats(allMatches, userId) {
     const uid = parseInt(userId, 10);
     let totalComebacks = 0;
-    let down1Opportunities = 0;
-    let down1Wins = 0;
-    let down2Opportunities = 0;
-    let down2Wins = 0;
+    let trailingMatches = 0;
+    let reverseSweeps = 0;
+    let trailing0_2Matches = 0;
 
     const comebackMatches = [];
 
     (allMatches || []).forEach(match => {
         if (!match.Score) return;
+
+        // Only consider completed matches (mirrors script.js isRenderableCompletedMatch).
+        const status = match.Status ? String(match.Status).toUpperCase() : '';
+        if (status !== 'C' && status !== 'RE') return;
+
         const games = match.Score.split(',').map(g => g.trim()).filter(Boolean);
         if (games.length === 0) return;
 
@@ -1174,16 +1551,14 @@ function computeComebackStats(allMatches, userId) {
 
         let userWins = 0;
         let oppWins = 0;
-        let wasDown1 = false;
-        let wasDown2 = false;
-        let everBehind = false;
+        let trailed = false;
+        let trailed0_2 = false;
 
         for (const g of games) {
             // Check deficits *before* tallying the current game result
             const diff = oppWins - userWins;
-            if (diff === 1) wasDown1 = true;
-            if (diff >= 2) wasDown2 = true;
-            if (oppWins > userWins) everBehind = true;
+            if (oppWins > userWins) trailed = true;
+            if (diff === 2) trailed0_2 = true; // 0-2 down before this game
 
             const parts = g.split('-').map(n => parseInt(n, 10));
             if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) continue;
@@ -1199,35 +1574,54 @@ function computeComebackStats(allMatches, userId) {
             }
         }
 
-        // Final check after loop in case deficit happened right before winning the match
-        if (oppWins - userWins === 1) wasDown1 = true;
-        if (oppWins - userWins >= 2) wasDown2 = true;
-        if (oppWins > userWins) everBehind = true;
+        // No final "trailed" check is needed: a match where the user was
+        // behind at ANY point will have oppWins > userWins before some game,
+        // which the loop above already captured. Adding checks after the loop
+        // would falsely flag e.g. a 2-3 loss after leading 2-0, or mislabel a
+        // 1-3 loss as "trailed 0-2".
 
-        if (wasDown1) {
-            down1Opportunities++;
-            if (didWin) down1Wins++;
-        }
-        if (wasDown2) {
-            down2Opportunities++;
-            if (didWin) down2Wins++;
-        }
+        // Only completed-match data reaches here, so any trailing = a real
+        // opportunity to make a comeback.
+        if (trailed) trailingMatches++;
+        if (trailed0_2) trailing0_2Matches++;
 
-        if (didWin && (everBehind || wasDown1 || wasDown2)) {
+        // Count only true comebacks (exact 4 patterns) as comeback wins.
+        if (isComebackWin(match, uid, currentUserFullName)) {
             totalComebacks++;
             comebackMatches.push(match);
+            // LLWWW = reverse sweep (won after being down 0-2)
+            const seq = String(match.Score).split(',').map(g => g.trim()).filter(Boolean).length === 5
+                ? String(match.Score).split(',').map(g => g.trim()).map(gg => {
+                    const parts = gg.split('-').map(n => parseInt(n, 10));
+                    const userScore = didWin ? parts[0] : parts[1];
+                    const oppScore = didWin ? parts[1] : parts[0];
+                    return userScore > oppScore ? 'W' : 'L';
+                }).join('')
+                : '';
+            if (seq === 'LLWWW') {
+                reverseSweeps++;
+                // TEMP TEST LOG: log the score and player names of every reverse sweep
+                console.log('[Reverse Sweep]', {
+                    matchId: match.Matchid,
+                    date: match.MatchDate,
+                    score: match.Score,
+                    homePlayer: match.hplayer1,
+                    visitingPlayer: match.vplayer1,
+                    winner: match.Winner,
+                    userWon: didWin
+                });
+            }
         }
     });
 
     return {
         totalComebacks,
         comebackMatches,
-        down1Rate: down1Opportunities > 0 ? Math.round((down1Wins / down1Opportunities) * 100) : 0,
-        down1Wins,
-        down1Opportunities,
-        down2Rate: down2Opportunities > 0 ? Math.round((down2Wins / down2Opportunities) * 100) : 0,
-        down2Wins,
-        down2Opportunities
+        trailingMatches,
+        trailing0_2Matches,
+        reverseSweeps,
+        comebackWinRate: trailingMatches > 0 ? Math.round((totalComebacks / trailingMatches) * 100) : 0,
+        reverseSweepRate: trailing0_2Matches > 0 ? Math.round((reverseSweeps / trailing0_2Matches) * 100) : 0
     };
 }
 /**
@@ -1303,11 +1697,12 @@ async function initializePage(currentUserId) {
 
 
     setupModalListeners();
+    setupMatchStatClickListeners(allMatches, currentUserId);
 
     document.getElementById('last-updated-date').textContent = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
-    // Load Top Opponents widget last since it performs multiple opponent rating API fetches
-    await fetchAndDisplayTopOpponents(currentUserId, allMatches);
+    // Load Top Losses by Opponent Rating (uses ratings already embedded in match objects, no extra API calls)
+    fetchAndDisplayTopLosses(currentUserId, allMatches);
 }
 
 

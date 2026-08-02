@@ -86,6 +86,7 @@ body {
   opacity: 0;
   width: 0;
   overflow: hidden;
+  margin-left: 0 !important; /* override inline margin so the logo centers when collapsed */
   transition: opacity 0.3s ease, width 0.3s ease;
 }
 
@@ -159,6 +160,158 @@ main {
 
 /* helper to lock body scrolling when sidebar is open */
 .no-scroll { overflow: hidden; }
+
+/* ===================== Match Insights Modal ===================== */
+
+@keyframes mi-pop-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes mi-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes mi-shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+
+.mi-shake { animation: mi-shake 0.5s; }
+
+#graph-modal.mi-open { animation: mi-fade-in 0.15s ease-out; }
+#graph-modal.mi-open > div { animation: mi-pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+
+.mi-header {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+}
+
+.mi-close-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: rgba(255,255,255,0.85);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.mi-close-btn:hover { background-color: rgba(255,255,255,0.18); color: #fff; }
+
+/* Segmented pill tabs */
+.mi-tab-nav {
+  display: flex;
+  flex-wrap: wrap; /* Wrap tabs to a new line when they don't fit (narrow screens / 5-game matches) */
+  justify-content: center; /* Center tabs when there are fewer games (3-4) */
+  gap: 0.375rem;
+  padding: 0.35rem;
+  background: #f1f0fb;
+  border-radius: 9999px;
+}
+.mi-tab-nav::-webkit-scrollbar { display: none; }
+
+.mi-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center; /* Center icon + label inside each tab */
+  flex: 1 1 auto; /* Let tabs stretch evenly to fill the row (segmented-control look) */
+  gap: 0.375rem;
+  white-space: nowrap;
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b6486;
+  border-radius: 9999px;
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.mi-tab-btn:hover { color: #4f46e5; }
+.mi-tab-btn.mi-active {
+  background: #ffffff;
+  color: #4f46e5;
+  box-shadow: 0 1px 3px rgba(79,70,229,0.25), 0 1px 2px rgba(0,0,0,0.06);
+}
+.mi-tab-btn .mi-tab-icon { width: 15px; height: 15px; }
+
+/* Stat chips */
+.mi-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  background: #fafaff;
+  border: 1px solid #ece9fb;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  min-width: 130px;
+  flex: 1 1 130px;
+}
+.mi-stat-icon {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.6rem;
+  background: rgba(79,70,229,0.1);
+  color: #4f46e5;
+}
+.mi-stat-icon svg { width: 16px; height: 16px; }
+.mi-stat-label { font-size: 0.7rem; font-weight: 600; color: #8b86a3; text-transform: uppercase; letter-spacing: 0.02em; }
+.mi-stat-value { font-size: 1rem; font-weight: 700; color: #1f1b3a; }
+
+/* Score header card */
+.mi-score-card {
+  background: linear-gradient(135deg, #f5f3ff 0%, #eef2ff 100%);
+  border: 1px solid #e5e0fb;
+  border-radius: 1rem;
+  padding: 1.1rem 1rem;
+}
+.mi-player-pill {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #37325a;
+}
+
+/* Access code gate */
+.mi-lock-circle {
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 9999px;
+  background: rgba(79,70,229,0.1);
+  color: #4f46e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+/* Skeleton loading state used briefly while checking a match for insights */
+.mi-skeleton {
+  background: linear-gradient(90deg, #f1f0fb 25%, #e6e3f8 37%, #f1f0fb 63%);
+  background-size: 400% 100%;
+  animation: mi-skeleton-loading 1.4s ease infinite;
+  border-radius: 0.6rem;
+}
+@keyframes mi-skeleton-loading {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* Top toast message enhancements */
+#temp-message-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+#temp-message-box svg { width: 18px; height: 18px; flex-shrink: 0; }
 
 /* Add padding to main on mobile to account for fixed bottom nav */
 @media (max-width: 767px) {

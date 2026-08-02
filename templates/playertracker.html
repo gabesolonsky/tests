@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Player Tracker</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='Logov3.png') }}" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
@@ -26,11 +27,11 @@
     <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
         <div class="flex items-center space-x-2">
-          <img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
-          <span class="text-xl font-semibold sidebar-text">Squash Stats</span>
+          <img src="{{ url_for('static', filename='Logov3.png') }}" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
+          <span class="text-xl font-semibold sidebar-text" style="margin-left: 6px;">Squash Stats</span>
         </div>
         <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevrons-left"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevrons-left"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
         </button>
       </div>
       <nav class="flex-1 overflow-y-auto mt-4 px-2 text-sm font-medium space-y-6">

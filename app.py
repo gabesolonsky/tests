@@ -9,6 +9,15 @@ COOKIES = {
     "USSQ-API-SESSION": "s%3A91Jljx_ZPF_B-uNFtHpYVnnO-58tVNFJ.rB2c%2BZht4NzgyLCCEnNV1wg5cmFLGsDtHdgUXDLWsIU"
 }
 
+USSQUASH_HEADERS = {
+    "Authorization": "Bearer YnsIGdSZGaV10eUmnDOEPnJMt308CQKv0RYnd0OjpquDza0Unya2bCggKcTTsouPUTOOoY323nBibePGhLKK5z4L3HUyJ3auIrmrS8RwMFBIZ6g93deSFyzi9gDnlwgTAmzJRBpz4FR43GfUu7IiPYlTdjne9MFSB8aTj7cYl1i9FLEUDabvTJJY0sdtWTsue6HOO2ouie82n1U5lEMtLzJKEjruuJ8AbWPJjvXunTJNJovIHHzrMYImtVlrUW7N",
+    "Origin": "https://clublocker.com",
+    "Referer": "https://clublocker.com/",
+    "Accept": "*/*",
+    "Content-Type": "application/json",
+    "User-Agent": "Mozilla/5.0"
+}
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -299,29 +308,58 @@ def proxy_search(query):
         logger.error(f"Unexpected error for search API: {e}")
         return jsonify({"error": "An unexpected error occurred."}), 500
 
-# NEW ROUTE: Proxy for liveScoreDetails API
+
+
 @app.route("/proxy/liveScoreDetails")
 def proxy_live_score_details():
     match_id = request.args.get('match_id')
+
     if not match_id:
         return jsonify({"error": "match_id is required"}), 400
-    
+
     api_url = f"https://api.ussquash.com/resources/res/matches/{match_id}/liveScoreDetails"
+
     logger.info(f"Fetching live score details from: {api_url}")
+
     try:
-        response = requests.get(api_url, cookies=COOKIES, timeout=10)
+        response = requests.get(
+            api_url,
+            headers=USSQUASH_HEADERS,
+            cookies=COOKIES,
+            timeout=60
+        )
+
         response.raise_for_status()
+
         return jsonify(response.json())
+
     except requests.exceptions.HTTPError as e:
         logger.error(f"HTTP error for liveScoreDetails API: {e}")
-        return jsonify({"error": str(e)}), response.status_code
+        return jsonify({
+            "error": str(e),
+            "status": response.status_code
+        }), response.status_code
+
+    except requests.exceptions.Timeout:
+        logger.error("LiveScoreDetails timed out")
+        return jsonify({
+            "error": "LiveScoreDetails API timed out"
+        }), 504
+
     except requests.exceptions.RequestException as e:
         logger.error(f"Request error for liveScoreDetails API: {e}")
-        return jsonify({"error": "Error fetching live score details data."}), 500
+        return jsonify({
+            "error": "Error fetching live score details data."
+        }), 500
+
     except Exception as e:
-        logger.error(f"Unexpected error for liveScoreDetails API: {e}")
-        return jsonify({"error": "An unexpected error occurred."}), 500
-    
+        logger.exception("Live score error")
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+
+
 @app.route("/proxy/player_tracker/add", methods=["POST"])
 def proxy_add_to_tracker():
     try:

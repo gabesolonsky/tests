@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>User Dashboard</title>
+  <title>Dashboard</title>
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='Logov3.png') }}" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -38,7 +39,7 @@
 <body class="bg-gray-100 antialiased text-gray-900">
 
   <!-- Loading Overlay -->
-  <div id="loading-overlay" class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ease-in-out" style="display: flex; opacity: 1; background: white;">
+  <div id="loading-overlay" class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ease-in-out bg-white/70 backdrop-blur-[2px]" style="display: flex; opacity: 1;">
     <div class="text-center">
       <div class="mb-6">
         <svg class="animate-spin h-10 w-10 text-indigo-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -51,12 +52,12 @@
     </div>
   </div>
   
-  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app" style="display: none;">
+  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app">
     <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
         <div class="flex items-center space-x-2">
-          <img src="https://ussquash.org/wp-content/uploads/2021/10/Vertical-01-696x665.jpg" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
-          <span class="text-xl font-semibold sidebar-text">Squash Stats</span>
+          <img src="{{ url_for('static', filename='Logov3.png') }}" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
+          <span class="text-xl font-semibold sidebar-text" style="margin-left: 6px;">Squash Stats</span>
         </div>
         <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevrons-left"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
@@ -275,7 +276,7 @@
           <div id="chart" class="flex-1 min-h-[200px] md:min-h-[300px]"></div>
         </div>
 
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-4 md:p-6 shadow-xl font-sans flex flex-col completed-matches-widget">
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-4 md:p-6 pb-5 shadow-xl font-sans flex flex-col completed-matches-widget">
           <h2 class="text-base md:text-lg font-semibold mb-2">Completed Matches</h2>
           <div id="matches-container" class="space-y-3 overflow-y-auto pr-2 no-scrollbar"></div>
           <div id="loading-matches-indicator" class="text-center py-2" style="display:none;">
@@ -327,8 +328,8 @@
           .ring-legend-group { transition: opacity 0.2s ease; }
           .ring-legend-group:hover { opacity: 0.7; }
         </style>
-
-        <!-- Singles record card -->
+<!-- 
+        // Singles record card 
         <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-3 md:p-4 shadow-xl font-sans">
           <h2 class="text-sm md:text-base font-semibold mb-2 text-gray-800">Singles Match Record</h2>
 
@@ -390,7 +391,7 @@
           </div>
         </div>
 
-        <!-- Doubles record card -->
+        // Double match record
         <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-3 md:p-4 shadow-xl font-sans">
           <h2 class="text-sm md:text-base font-semibold mb-2 text-gray-800">Doubles Match Record</h2>
 
@@ -441,7 +442,7 @@
               </div>
               <div id="record-doubles-match-list"></div>
             </div>
-          </div>
+          </div> -->
 
           <div id="record-doubles-empty-state" class="record-empty-state hidden flex-col items-center justify-center text-center py-8 px-4 rounded-xl">
             <div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center mb-2">
@@ -455,19 +456,20 @@
     </main>
   </div>
 
-  <div id="graph-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4 z-50 hidden">
-    <div class="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
-      <div class="flex justify-between items-center border-b border-gray-200 px-6 py-4">
-        <h3 class="text-xl font-semibold text-gray-800">Match Insights</h3>
-        <button id="graph-close" class="text-gray-500 hover:text-gray-700">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+  <div id="graph-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
+      <div class="mi-header flex justify-between items-center px-5 py-4 sm:px-6 rounded-t-2xl sticky top-0 z-10">
+        <div class="flex items-center gap-2.5 text-white">
+          <span id="match-insights-icon" class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center [&>svg]:w-4.5 [&>svg]:h-4.5"></span>
+          <h3 id="match-insights-title" class="text-lg font-semibold">Match Insights</h3>
+        </div>
+        <button id="graph-close" class="mi-close-btn" aria-label="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </div>
-      <div class="p-6">
+      <div class="p-5 sm:p-6">
         <p id="graph-status" class="text-center text-gray-500 mb-4"></p>
-        <div id="metrics-container" class="min-h-[200px] flex flex-col">
-          <div class="text-center text-gray-400 py-10">Loading match data...</div>
-        </div>
+        <div id="metrics-container" class="min-h-[200px] flex flex-col"></div>
       </div>
     </div>
   </div>
