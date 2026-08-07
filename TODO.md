@@ -1,5 +1,39 @@
 # Task Log
 
+## Done: Mobile bottom nav — 5 tabs (all 5 templates)
+- [x] Added a "Rankings" tab to the mobile bottom nav on every page
+- [x] Renamed the "Teams" tab to "College Teams"
+- [x] Resulting tab order on all pages: Dashboard, Analytics, Tracker, Rankings, College Teams
+  - `templates/dashboard.html`
+  - `templates/analytics.html`
+  - `templates/playertracker.html`
+  - `templates/collegeteams.html`
+  - `templates/rankings.html`
+- [x] Verified CSS flex layout and `mobile-nav.js` handle 5 tabs (generic `.mobile-nav-btn` iteration; `flex: 1` distributes evenly)
+- [x] Verified all routes return HTTP 200 with 5 nav buttons, a Rankings tab, and a College Teams tab
+
+## Done: College Teams sidebar reorganization (all 5 templates)
+- [x] Removed the "Work in Progress" / under-construction badge from the Teams link
+- [x] Removed the "College Squash Association" sidebar section entirely (removes Schedule + Standings "Coming soon" links)
+- [x] Moved the Teams link into the "Players" section and renamed it "College Teams"
+  - `templates/dashboard.html`
+  - `templates/analytics.html`
+  - `templates/playertracker.html`
+  - `templates/collegeteams.html`
+  - `templates/rankings.html`
+- [x] Removed the construction icon from the Teams button in the mobile bottom nav (dashboard, analytics, playertracker)
+- [x] Verified all routes return HTTP 200 with the College Teams link, and no "Work in Progress" / "College Squash Association" references remain
+
+## Done: Rankings page linked + sidebar updated
+- [x] Move `rankings.html` from project root into `templates/` so the existing `/rankings` Flask route resolves it (was otherwise broken — Flask looks in `templates/` by default)
+- [x] Update the "Rankings" sidebar link (was `href="#"` with a "Coming soon" badge) to point to `/rankings` and remove the "Coming soon" badge on all pages:
+  - `templates/dashboard.html`
+  - `templates/analytics.html`
+  - `templates/playertracker.html`
+  - `templates/collegeteams.html`
+- [x] Leave all other "Coming soon" badges (Events, Leagues, Clubs, Schedule, Standings, Help, Settings) and the Teams "Work in Progress" badge untouched
+- [x] Verified `/rankings` returns HTTP 200 and renders the Rankings page + sidebar link
+
 ## Done: "Work in Progress" badge next to Teams link
 - [x] Add yellow "Work in Progress" badge + lucide construction icon to Teams sidebar link in all 4 templates
   - `templates/dashboard.html`

@@ -475,6 +475,10 @@ def analytics():
 def collegeteams():
     return render_template("collegeteams.html")
 
+@app.route("/rankings")
+def rankings():
+    return render_template("rankings.html")
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=True)

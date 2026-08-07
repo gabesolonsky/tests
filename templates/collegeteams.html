@@ -6,66 +6,143 @@
   <title>College Teams</title>
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='Logov3.png') }}" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
+
   <style>
-    /* hide scrollbars for standings lists but keep scrolling */
-    .standings-list { -ms-overflow-style: none; scrollbar-width: none; }
-    .standings-list::-webkit-scrollbar { display: none; width: 0; height: 0; }
-    /* subtle shadow when column header is sticky inside scroll area */
-    .standings-columns > .grid { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
-    /* responsive grid for standings so header columns align with rows */
-    .standings-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-    @media (min-width: 768px) {
-      /* Rank | Team (flexible) | Wins-Losses | Individual Matches | Win% */
-      .standings-grid { grid-template-columns: 48px 1fr 96px 128px 72px; }
+    .college-shell {
+      background:
+        radial-gradient(circle at top right, rgba(99,102,241,.075), transparent 29rem),
+        #f3f4f6;
     }
-    /* small spinner for loading roster */
-    .spinner { border: 4px solid rgba(0,0,0,0.08); border-left-color: #7c3aed; border-radius: 9999px; width: 32px; height: 32px; animation: spin 0.9s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    /* player hover chart container interactive styles */
-    #player-hover-chart { transition: transform .12s ease, opacity .12s ease; opacity: 0; }
-    #player-hover-chart.show { opacity: 1; transform: translateY(0); }
-    /* ensure team modal body can scroll and hide scrollbars */
-    #team-preview-body { max-height: 60vh; overflow-y: auto; -ms-overflow-style: none; scrollbar-width: none; }
-    #team-preview-body::-webkit-scrollbar { display: none; width: 0; height: 0; }
-    /* make the team preview logo feel interactive and layout CTA buttons nicely */
-    #team-preview-logo { cursor: pointer; }
-    @media (max-width: 640px) {
-      /* stack header CTAs on small screens */
-      #team-preview-modal .flex.items-start.justify-between { flex-direction: column; gap: 8px; }
-      #team-preview-modal .flex-shrink-0.flex.items-center.gap-2 { width: 100%; justify-content: flex-end; }
+
+    .surface {
+      background: rgba(255,255,255,.78);
+      backdrop-filter: blur(12px);
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+      box-shadow: 0 10px 30px rgba(15,23,42,.055);
     }
-    /* ensure roster & schedule columns are independently scrollable and hide scrollbar chrome */
-    #team-preview-roster, #team-preview-schedule { max-height: 70vh; -ms-overflow-style: none; scrollbar-width: none; }
-    #team-preview-roster::-webkit-scrollbar, #team-preview-schedule::-webkit-scrollbar { display: none; width: 0; height: 0; }
-    /* Mobile improvements for team containers */
-    @media (max-width: 768px) {
-      .team-container { padding: 1rem !important; margin-bottom: 1rem; }
-      .team-card { padding: 1rem; margin-bottom: 0.5rem; border-radius: 12px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-      .team-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-      .team-card h3 { font-size: 1.125rem; margin-bottom: 0.5rem; }
-      .team-card p { font-size: 0.875rem; }
-      /* Mobile standings improvements */
-      .standings-grid { display: flex; flex-direction: column; gap: 0.5rem; }
-      .standings-grid > div { display: flex; justify-content: space-between; align-items: center; padding: 0.25rem 0; }
-      .standings-grid > div:first-child { font-weight: 600; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; margin-bottom: 0.5rem; }
-      .standings-grid > div:not(:first-child) { border-bottom: 1px solid #f3f4f6; }
-      .standings-grid > div > div { flex: 1; text-align: left; }
-      .standings-grid > div > div:nth-child(1) { flex: 0 0 60px; font-weight: 500; } /* Rank */
-      .standings-grid > div > div:nth-child(2) { flex: 1; } /* Team */
-      .standings-grid > div > div:nth-child(3) { flex: 0 0 80px; text-align: center; } /* Wins-Losses */
-      .standings-grid > div > div:nth-child(4) { flex: 0 0 100px; text-align: center; } /* Individual Matches */
-      .standings-grid > div > div:nth-child(5) { flex: 0 0 60px; text-align: center; } /* Win % */
-      .standings-row { padding: 0.75rem 0; border-radius: 8px; transition: background-color 0.2s ease; }
-      .standings-row:hover { background-color: #f9fafb; }
+
+    .division-chip,
+    .view-chip {
+      transition: background-color .18s ease, color .18s ease, border-color .18s ease, transform .18s ease;
+    }
+
+    .division-chip:hover,
+    .view-chip:hover {
+      transform: translateY(-1px);
+    }
+
+    .division-chip.active,
+    .view-chip.active {
+      background: #4f46e5;
+      border-color: #4f46e5;
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(79,70,229,.18);
+    }
+
+    .team-row {
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+    }
+
+    .team-row:hover {
+      transform: translateY(-1px);
+      border-color: #c7d2fe;
+      box-shadow: 0 7px 18px rgba(15,23,42,.055);
+      background: #fff;
+    }
+
+    .podium-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .podium-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 4px;
+      background: var(--podium-color);
+    }
+
+    .podium-gold {
+      --podium-color: #eab308;
+      background: linear-gradient(180deg, rgba(254,249,195,.8), rgba(255,255,255,.95));
+    }
+
+    .podium-silver {
+      --podium-color: #9ca3af;
+      background: linear-gradient(180deg, rgba(243,244,246,.95), rgba(255,255,255,.95));
+    }
+
+    .podium-bronze {
+      --podium-color: #b45309;
+      background: linear-gradient(180deg, rgba(254,243,199,.65), rgba(255,255,255,.95));
+    }
+
+    .compare-meter {
+      position: relative;
+      overflow: hidden;
+      background: #e5e7eb;
+      height: 12px;
+      border-radius: 9999px;
+    }
+
+    .compare-meter-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #6366f1, #8b5cf6);
+      transition: width .35s ease;
+    }
+
+    .compare-meter-center {
+      position: absolute;
+      top: -2px;
+      bottom: -2px;
+      left: 50%;
+      width: 1px;
+      background: rgba(55,65,81,.5);
+      z-index: 2;
+    }
+
+    .modal-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: #d1d5db transparent;
+    }
+
+    .rank-circle {
+      width: 2.35rem;
+      height: 2.35rem;
+      border-radius: 9999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    @media (max-width: 767px) {
+      .podium-grid {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .podium-first { order: 1; }
+      .podium-second { order: 2; }
+      .podium-third { order: 3; }
+
+      .desktop-only {
+        display: none !important;
+      }
     }
   </style>
 </head>
-<body class="bg-gray-100 antialiased text-gray-900">
-  <!-- Loading Overlay -->
-  <div id="loading-overlay" class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ease-in-out" style="display: flex; opacity: 1; background: white;">
+
+<body class="college-shell antialiased text-gray-900">
+  <div id="loading-overlay" class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-200 ease-in-out bg-white/70 backdrop-blur-[2px]" style="display: flex; opacity: 1;">
     <div class="text-center">
       <div class="mb-6">
         <svg class="animate-spin h-10 w-10 text-indigo-500 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -77,215 +154,416 @@
       <p class="text-sm text-gray-400">Please wait a moment</p>
     </div>
   </div>
-  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app" style="display: none;">
+
+  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app" style="display:none;">
     <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
       <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
         <div class="flex items-center space-x-2">
           <img src="{{ url_for('static', filename='Logov3.png') }}" alt="Logo" class="w-6 h-6 object-contain shrink-0" />
-          <span class="text-xl font-semibold sidebar-text" style="margin-left: 6px;">Squash Stats</span>
+          <span class="text-xl font-semibold sidebar-text" style="margin-left:6px;">Squash Stats</span>
         </div>
-        <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevrons-left"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-          </svg>
+        <button onclick="toggleSidebar()" class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all" aria-label="Toggle sidebar">
+          <i data-lucide="chevrons-left" class="w-6 h-6"></i>
         </button>
       </div>
+
       <nav class="flex-1 overflow-y-auto mt-4 px-2 text-sm font-medium space-y-6">
-
         <div>
-            <p class="text-gray-500 uppercase sidebar-text">Profile</p>
-            <ul class="mt-2 space-y-1">
-                <li><a href="/dashboard" id="dashboard-link" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="sidebar-text">Dashboard</span></a></li>
-                <li><a href="/analytics" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="bar-chart" class="w-5 h-5"></i><span class="sidebar-text">Analytics</span></a></li>
-                <li><a href="/playertracker" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="user-round-search" class="w-5 h-5"></i><span class="sidebar-text">Advanced Player Tracker</span></a></li>
-            </ul>
+          <p class="text-gray-500 uppercase sidebar-text">Profile</p>
+          <ul class="mt-2 space-y-1">
+            <li><a href="/dashboard" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="layout-dashboard" class="w-5 h-5"></i><span class="sidebar-text">Dashboard</span></a></li>
+            <li><a href="/analytics" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="bar-chart" class="w-5 h-5"></i><span class="sidebar-text">Analytics</span></a></li>
+            <li><a href="/playertracker" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="user-round-search" class="w-5 h-5"></i><span class="sidebar-text">Advanced Player Tracker</span></a></li>
+          </ul>
         </div>
 
         <div>
-            <p class="text-gray-500 uppercase sidebar-text">Players</p>
-            <ul class="mt-2 space-y-1">
-
-                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar" class="w-5 h-5"></i><span class="sidebar-text">Events <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Rankings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+          <p class="text-gray-500 uppercase sidebar-text">Players</p>
+          <ul class="mt-2 space-y-1">
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar" class="w-5 h-5"></i><span class="sidebar-text">Events <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+<li><a href="/rankings" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Rankings</span></a></li>
+                  <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-100 text-purple-600"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">College Teams</span></a></li>
                   <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="columns-3" class="w-5 h-5"></i><span class="sidebar-text">Leagues <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="house" class="w-5 h-5"></i><span class="sidebar-text">Clubs <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-            </ul>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="house" class="w-5 h-5"></i><span class="sidebar-text">Clubs <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+          </ul>
+        </div>
+
+<div>
+          <p class="text-gray-500 uppercase sidebar-text">Other</p>
+          <ul class="mt-2 space-y-1">
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="life-buoy" class="w-5 h-5"></i><span class="sidebar-text">Help <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+            <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Settings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
+          </ul>
         </div>
 
         <div>
-            <p class="text-gray-500 uppercase sidebar-text">College Squash Association</p>
-            <ul class="mt-2 space-y-1">
-
-                  <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-100 text-purple-600"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams <span class="ml-2 inline-flex items-center gap-1 text-xs text-yellow-800 bg-yellow-100 px-1.5 py-0.5 rounded-full"><i data-lucide="construction" class="w-3 h-3"></i>Work in Progress</span></span></a></li>
-                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-            </ul>
-        </div>
-
-        <div>
-            <p class="text-gray-500 uppercase sidebar-text">Other</p>
-            <ul class="mt-2 space-y-1">
-
-                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="life-buoy" class="w-5 h-5"></i><span class="sidebar-text">Help <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-                  <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="settings" class="w-5 h-5"></i><span class="sidebar-text">Settings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
-            </ul>
-        </div>
-
-        <div>
-            <p class="text-gray-500 uppercase sidebar-text mt-6">Contact</p>
-            <ul class="mt-2 space-y-1">
-                <li><a href="tel:301-347-8710" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
-                    <i data-lucide="phone" class="w-5 h-5"></i><span class="sidebar-text">Contact Us: 301-347-8710</span>
-                </a></li>
-            </ul>
+          <p class="text-gray-500 uppercase sidebar-text mt-6">Contact</p>
+          <ul class="mt-2 space-y-1">
+            <li><a href="tel:301-347-8710" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="phone" class="w-5 h-5"></i><span class="sidebar-text">Contact Us: 301-347-8710</span></a></li>
+          </ul>
         </div>
       </nav>
     </aside>
 
-    <main class="flex-1 overflow-y-auto p-6">
-      <div class="flex flex-col md:flex-row md:justify-between md:items-center mb-6 gap-4">
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-8">
+      <header class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-5">
         <div>
-          <h1 id="welcome-message" class="text-2xl font-semibold tracking-tight">College Teams Overview</h1>
-          <p class="text-sm text-gray-500">Explore team performance and analytics.</p>
-        </div>
-        <!-- Mobile tab bar: visible only on small screens -->
-        <div class="md:hidden w-full">
-          <div class="flex gap-2 bg-white/70 backdrop-blur-md border border-gray-200 rounded-xl p-1 shadow-sm">
-            <button onclick="showCollegeTab('college-dashboard')" class="flex-1 px-4 py-3 rounded-lg bg-purple-100 text-purple-800 text-sm font-medium transition-all active:scale-95">Overview</button>
-            <button onclick="showCollegeTab('college-analytics')" class="flex-1 px-4 py-3 rounded-lg bg-gray-100 text-gray-700 text-sm font-medium transition-all active:scale-95">Analytics</button>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl md:text-3xl font-semibold tracking-tight">College Squash</h1>
+            <span class="inline-flex items-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700">
+              <span class="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+              Live data
+            </span>
           </div>
+          <p class="text-sm text-gray-500 mt-1">Standings, rosters, schedules, and team-to-team lineup comparisons.</p>
         </div>
-        <!-- Search removed for this page -->
-      </div>
 
-      <section id="college-analytics" class="college-tab-content hidden">
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
-          <h2 class="text-xl font-semibold mb-4 text-gray-800">College Teams Analytics</h2>
-          <p class="text-gray-700">This section will provide in-depth analytical charts and data for college teams.</p>
-          <div class="grid grid-cols-1 gap-6 mt-6">
-            <div class="bg-purple-50 p-4 rounded-lg shadow-sm">
-                <h3 class="font-semibold text-lg text-purple-800">Team Performance Trends</h3>
-                <div id="team-performance-chart" class="h-64">
-                    <p class="text-center text-gray-500 mt-10">Loading team performance chart...</p>
-                </div>
+        <div class="surface p-1 flex w-full sm:w-auto">
+          <button id="view-standings-btn" class="view-chip active flex-1 sm:flex-none px-4 py-2 rounded-xl border border-transparent text-sm font-semibold">
+            Standings
+          </button>
+          <button id="view-compare-btn" class="view-chip flex-1 sm:flex-none px-4 py-2 rounded-xl border border-transparent text-sm font-semibold text-gray-600">
+            Compare Teams
+          </button>
+        </div>
+      </header>
+
+      <section id="standings-view">
+        <div class="surface p-3 md:p-4 mb-5">
+          <div class="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Division</p>
+              <p class="text-sm text-gray-500">Switch between CSA team groups.</p>
             </div>
-            <div class="bg-red-50 p-4 rounded-lg shadow-sm">
-                <h3 class="font-semibold text-lg text-red-800">Player Contribution Breakdown</h3>
-                <div class="h-64 flex items-center justify-center">
-                    <div class="text-center">
-                        <div class="text-4xl mb-4">🚧</div>
-                        <p class="text-gray-600 font-medium">Coming Soon</p>
-                        <p class="text-sm text-gray-500 mt-2">Detailed player analytics will be available here.</p>
-                    </div>
-                </div>
-            </div>
+            <i data-lucide="layers-3" class="w-5 h-5 text-indigo-500"></i>
+          </div>
+          <div id="division-tabs" class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <button class="division-chip active rounded-xl border border-indigo-200 px-3 py-2.5 text-sm font-semibold" data-division="5733">Men's Varsity</button>
+            <button class="division-chip rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-600" data-division="5736">Women's Varsity</button>
+            <button class="division-chip rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-600" data-division="5735">Women's Club</button>
+            <button class="division-chip rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-semibold text-gray-600" data-division="5734">Mixed Club</button>
           </div>
         </div>
+
+        <section class="grid grid-cols-2 xl:grid-cols-3 gap-3 mb-5">
+          <div class="surface p-4">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Teams</p>
+                <p id="metric-teams" class="text-2xl font-black text-gray-900 mt-1">—</p>
+              </div>
+              <span class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><i data-lucide="users" class="w-4 h-4"></i></span>
+            </div>
+          </div>
+
+          <div class="surface p-4">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Division Leader</p>
+                <p id="metric-leader" class="text-base md:text-lg font-black text-gray-900 mt-1 truncate">—</p>
+              </div>
+              <span class="w-9 h-9 rounded-xl bg-yellow-50 text-yellow-600 flex items-center justify-center shrink-0"><i data-lucide="crown" class="w-4 h-4"></i></span>
+            </div>
+          </div>
+
+          <div class="surface p-4 col-span-2 xl:col-span-1">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-gray-400">Individual Wins</p>
+                <p id="metric-individual-wins" class="text-2xl font-black text-gray-900 mt-1">—</p>
+              </div>
+              <span class="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center"><i data-lucide="circle-check-big" class="w-4 h-4"></i></span>
+            </div>
+          </div>
+        </section>
+
+        <section class="surface p-4 md:p-6 mb-5">
+          <div class="flex items-center justify-between gap-4 mb-5">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-indigo-500">At a glance</p>
+              <h2 id="division-title" class="text-xl font-semibold text-gray-900 mt-0.5">Men's Varsity</h2>
+              <p class="text-sm text-gray-500 mt-0.5">Current top three teams.</p>
+            </div>
+            <i data-lucide="trophy" class="w-6 h-6 text-yellow-500"></i>
+          </div>
+          <div id="podium-container" class="podium-grid grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 items-end">
+            <div class="md:col-span-3 py-10 text-center text-sm text-gray-400">Loading leaders…</div>
+          </div>
+        </section>
+
+        <section class="surface overflow-hidden">
+          <div class="p-4 md:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900">Team Rankings</h2>
+              <p id="standings-subtitle" class="text-sm text-gray-500">Loading standings…</p>
+            </div>
+            <div class="relative w-full sm:w-64">
+              <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+              <input id="team-search"
+                     type="text"
+                     placeholder="Find a team..."
+                     class="w-full rounded-xl border border-gray-200 bg-white pl-9 pr-3 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+            </div>
+          </div>
+
+          <div id="standings-list" class="p-3 md:p-4 grid gap-2">
+            <div class="py-12 text-center text-sm text-gray-400">Loading teams…</div>
+          </div>
+        </section>
       </section>
 
-      </section>
+      <section id="compare-view" class="hidden">
+        <div class="surface p-4 md:p-6 mb-5">
+          <div class="flex items-start justify-between gap-4 mb-5">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-wide text-indigo-500">Head to head</p>
+              <h2 class="text-xl font-semibold text-gray-900 mt-0.5">Compare Two Teams</h2>
+              <p class="text-sm text-gray-500 mt-1">Compare each team's top nine rated players and project the lineup result.</p>
+            </div>
+            <span class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0"><i data-lucide="git-compare-arrows" class="w-5 h-5"></i></span>
+          </div>
 
-      <section id="college-dashboard" class="college-tab-content">
-        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans">
-          <!-- Page title removed per request -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div id="mens-varsity-container" class="bg-purple-50 p-6 rounded-xl shadow-sm">
-              <div id="mens-varsity-content" class="grid grid-cols-1 gap-6">
-                <p class="text-center text-gray-500 mt-10">Loading men's varsity teams data...</p>
-              </div>
+          <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 lg:items-end">
+            <div>
+              <label for="compare-team-a" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Team A</label>
+              <select id="compare-team-a" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                <option value="">Choose a team...</option>
+              </select>
             </div>
 
-            <div id="womens-varsity-container" class="bg-purple-50 p-6 rounded-xl shadow-sm">
-              <div id="womens-varsity-content" class="grid grid-cols-1 gap-6">
-                <p class="text-center text-gray-500 mt-10">Loading women's varsity teams data...</p>
-              </div>
-            </div>
+            <button id="swap-teams-btn"
+                    class="h-11 w-full lg:w-11 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-gray-600 flex items-center justify-center transition-colors"
+                    aria-label="Swap teams">
+              <i data-lucide="arrow-left-right" class="w-4 h-4"></i>
+            </button>
 
-            <div id="womens-club-container" class="bg-purple-50 p-6 rounded-xl shadow-sm">
-              <div id="womens-club-content" class="grid grid-cols-1 gap-6">
-                <p class="text-center text-gray-500 mt-10">Loading women's club teams data...</p>
-              </div>
-            </div>
-
-            <div id="mixed-club-container" class="bg-purple-50 p-6 rounded-xl shadow-sm">
-              <div id="mixed-club-content" class="grid grid-cols-1 gap-6">
-                <p class="text-center text-gray-500 mt-10">Loading mixed club teams data...</p>
-              </div>
+            <div>
+              <label for="compare-team-b" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Team B</label>
+              <select id="compare-team-b" class="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">
+                <option value="">Choose a team...</option>
+              </select>
             </div>
           </div>
-            </section>
 
-            <!-- Team details panel (hidden until a team is selected) -->
-            <section id="team-details" class="hidden mt-6 bg-white border border-gray-200 rounded-2xl p-6 shadow-lg">
-              <div class="flex items-center justify-between mb-4">
-                <div>
-                  <h2 id="team-title" class="text-xl font-semibold text-gray-800">Team</h2>
-                  <p id="team-sub" class="text-sm text-gray-500">Roster</p>
-                </div>
-                <div class="flex items-center gap-2">
-                  <button id="back-to-team-list" class="text-sm px-3 py-2 rounded bg-gray-100 hover:bg-gray-200">Back</button>
-                </div>
-              </div>
-              <div id="team-roster" class="grid gap-3">
-                <p class="text-sm text-gray-500">Select a team to view roster.</p>
-              </div>
-            </section>
+          <button id="compare-btn"
+                  class="mt-4 w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            Compare Teams
+          </button>
 
+          <p id="compare-error" class="hidden mt-3 text-sm font-medium text-red-500"></p>
+        </div>
+
+        <div id="compare-loading" class="hidden surface p-10 text-center mb-5">
+          <svg class="animate-spin h-8 w-8 text-indigo-500 mx-auto mb-3"
+               xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <p class="font-semibold text-gray-700">Loading both lineups…</p>
+        </div>
+
+        <div id="compare-results" class="hidden space-y-5">
+          <section class="surface p-4 md:p-6">
+            <div id="compare-team-header" class="grid grid-cols-[1fr_auto_1fr] gap-3 items-center mb-5"></div>
+
+            <div class="rounded-2xl border border-indigo-100 bg-indigo-50/65 p-4 md:p-5">
+              <div class="text-center">
+                <p class="text-xs font-semibold uppercase tracking-wide text-indigo-500">Projected Match</p>
+                <p id="projected-score" class="text-4xl md:text-5xl font-black text-gray-900 mt-1">—</p>
+                <p id="projected-winner" class="text-sm font-semibold text-gray-600 mt-1"></p>
+              </div>
+
+              <div class="mt-5">
+                <div class="flex items-center justify-between gap-3 text-sm font-bold text-gray-700 mb-2">
+                  <span id="probability-a">50%</span>
+                  <span class="text-xs font-medium uppercase tracking-wide text-gray-400">Team win probability</span>
+                  <span id="probability-b">50%</span>
+                </div>
+                <div class="compare-meter">
+                  <div class="compare-meter-center"></div>
+                  <div id="compare-probability-fill" class="compare-meter-fill" style="width:50%;left:0;"></div>
+                </div>
+                <p class="text-center text-[11px] text-gray-400 mt-2">Experimental estimate based only on available player ratings.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="surface p-4 text-center">
+              <p class="text-xs uppercase tracking-wide font-semibold text-gray-400">Team A Avg</p>
+              <p id="compare-avg-a" class="text-2xl font-black mt-1">—</p>
+            </div>
+            <div class="surface p-4 text-center">
+              <p class="text-xs uppercase tracking-wide font-semibold text-gray-400">Team B Avg</p>
+              <p id="compare-avg-b" class="text-2xl font-black mt-1">—</p>
+            </div>
+            <div class="surface p-4 text-center">
+              <p class="text-xs uppercase tracking-wide font-semibold text-gray-400">Rating Edge</p>
+              <p id="compare-rating-edge" class="text-xl font-black mt-1">—</p>
+            </div>
+            <div class="surface p-4 text-center">
+              <p class="text-xs uppercase tracking-wide font-semibold text-gray-400">Lineups Used</p>
+              <p id="compare-lineups-used" class="text-2xl font-black mt-1">—</p>
+            </div>
+          </section>
+
+          <section class="surface overflow-hidden">
+            <div class="p-4 md:p-5 border-b border-gray-100">
+              <h3 class="text-lg font-semibold text-gray-900">Projected Lineup</h3>
+              <p class="text-sm text-gray-500 mt-0.5">Players are ordered by team position when available, then by rating.</p>
+            </div>
+            <div id="lineup-comparison" class="p-3 md:p-4 grid gap-2"></div>
+          </section>
+        </div>
+
+        <div id="compare-empty" class="surface p-10 md:p-14 text-center">
+          <span class="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mx-auto mb-4">
+            <i data-lucide="git-compare-arrows" class="w-7 h-7"></i>
+          </span>
+          <h3 class="font-semibold text-gray-800">Choose two teams to compare</h3>
+          <p class="text-sm text-gray-500 mt-1 max-w-md mx-auto">You'll get a projected team score, rating edge, win probability, and a position-by-position lineup comparison.</p>
+        </div>
+      </section>
     </main>
-    <!--// ====== PREDICTOR TAB ====== 
-    <div id="tab-predictor" class="tab-content hidden">
-      <div class="glass-card rounded-2xl p-6 max-w-4xl mx-auto">
-        <h2 class="text-xl font-semibold text-gray-800 mb-1">Team vs. Team Predictor</h2>
-        <p class="text-sm text-gray-500 mb-6">Select two teams to see a predicted score based on top 9 players' ratings.</p>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Team A</label>
-            <select id="team-a-select" class="team-select">
-              <option value="">Choose team...</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Team B</label>
-            <select id="team-b-select" class="team-select">
-              <option value="">Choose team...</option>
-            </select>
-          </div>
-        </div>
-
-        <button id="predict-btn" class="w-full md:w-auto px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-          <i data-lucide="zap" class="w-5 h-5"></i> Predict
-        </button>
-
-        // Result area 
-        <div id="prediction-result" class="mt-6 hidden">
-          <div class="bg-indigo-50 rounded-xl p-4 mb-4 flex items-center justify-between flex-wrap gap-2">
-            <span class="font-bold text-lg text-indigo-900">Predicted Score</span>
-            <span id="prediction-score" class="score-badge text-lg px-4 py-1">0 – 0</span>
-          </div>
-          <div id="prediction-details" class="space-y-1 text-sm">
-            // Individual matchups will be injected here 
-          </div>
-        </div>
-        <div id="prediction-error" class="mt-4 text-red-500 text-sm hidden"></div>
-      </div>
-    </div>
-  -->
-
-    <!-- Mobile bottom navigation -->
     <div id="mobile-nav" class="mobile-bottom-nav md:hidden" role="navigation" aria-label="Mobile navigation">
       <button class="mobile-nav-btn" data-target="/dashboard" aria-label="Dashboard"><i data-lucide="home"></i><span>Dashboard</span></button>
       <button class="mobile-nav-btn" data-target="/analytics" aria-label="Analytics"><i data-lucide="bar-chart-2"></i><span>Analytics</span></button>
-      <button class="mobile-nav-btn" data-target="/playertracker" aria-label="Tracker"><i data-lucide="user"></i><span>Tracker</span></button>
-      <button class="mobile-nav-btn" data-target="/collegeteams" aria-label="Teams"><i data-lucide="users"></i><span class="inline-flex items-center gap-1">Teams <i data-lucide="construction" class="w-3 h-3 text-yellow-600"></i></span></button>
+<button class="mobile-nav-btn" data-target="/playertracker" aria-label="Tracker"><i data-lucide="user"></i><span>Tracker</span></button>
+      <button class="mobile-nav-btn" data-target="/rankings" aria-label="Rankings"><i data-lucide="trophy"></i><span>Rankings</span></button>
+      <button class="mobile-nav-btn" data-target="/collegeteams" aria-label="College Teams"><i data-lucide="users"></i><span>College Teams</span></button>
     </div>
   </div>
 
-<script src="{{ url_for('static', filename='collegeteams.js') }}"></script>
-<script src="{{ url_for('static', filename='mobile-nav.js') }}"></script>
-        <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
-        <script> if(window.lucide) lucide.createIcons(); </script>
-      </body>
-      </html>
+  <!-- Team detail modal -->
+  <div id="team-modal" class="fixed inset-0 z-[90] hidden items-center justify-center p-3 md:p-6">
+    <div class="absolute inset-0 bg-gray-950/55 backdrop-blur-sm" data-team-modal-close="true"></div>
+    <div class="relative w-full max-w-5xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div class="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <div id="team-modal-logo-wrap" class="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
+            <i data-lucide="shield" class="w-6 h-6 text-gray-400"></i>
+          </div>
+          <div class="min-w-0">
+            <p id="team-modal-division" class="text-xs font-semibold uppercase tracking-wide text-indigo-500"></p>
+            <h2 id="team-modal-name" class="text-lg md:text-xl font-semibold text-gray-900 truncate">Team</h2>
+          </div>
+        </div>
+        <button id="team-modal-close" class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-gray-50 flex items-center justify-center shrink-0" aria-label="Close">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="modal-scroll overflow-y-auto p-4 md:p-6">
+        <div id="team-modal-metrics" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"></div>
+
+        <div class="rounded-2xl border border-gray-200 bg-gray-50/70 p-1 grid grid-cols-3 gap-1 mb-5">
+          <button id="team-tab-roster"
+                  class="team-detail-tab rounded-xl bg-white shadow-sm px-3 py-2.5 text-sm font-semibold text-indigo-600"
+                  data-team-tab="roster">
+            Roster <span id="roster-count" class="ml-1 text-xs text-gray-400"></span>
+          </button>
+          <button id="team-tab-results"
+                  class="team-detail-tab rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-500"
+                  data-team-tab="results">
+            Results <span id="results-count" class="ml-1 text-xs text-gray-400"></span>
+          </button>
+          <button id="team-tab-upcoming"
+                  class="team-detail-tab rounded-xl px-3 py-2.5 text-sm font-semibold text-gray-500"
+                  data-team-tab="upcoming">
+            Upcoming <span id="upcoming-count" class="ml-1 text-xs text-gray-400"></span>
+          </button>
+        </div>
+
+        <section id="team-panel-roster" class="team-detail-panel">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="font-semibold text-gray-900">Team Roster</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Players are listed in lineup order from top to bottom. Position 0 is shown last.</p>
+            </div>
+          </div>
+          <div id="team-modal-roster" class="grid grid-cols-1 gap-2">
+            <p class="text-sm text-gray-400">Loading roster…</p>
+          </div>
+        </section>
+
+        <section id="team-panel-results" class="team-detail-panel hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="font-semibold text-gray-900">Completed Matches</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Select a match to view it individually.</p>
+            </div>
+          </div>
+          <div id="team-modal-results" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <p class="text-sm text-gray-400">Loading results…</p>
+          </div>
+        </section>
+
+        <section id="team-panel-upcoming" class="team-detail-panel hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="font-semibold text-gray-900">Upcoming Matches</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Future and unplayed team matches.</p>
+            </div>
+          </div>
+          <div id="team-modal-upcoming" class="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <p class="text-sm text-gray-400">Loading schedule…</p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Individual team match modal -->
+  <div id="match-detail-modal" class="fixed inset-0 z-[96] hidden items-center justify-center p-3 md:p-6">
+    <div class="absolute inset-0 bg-gray-950/60 backdrop-blur-sm" data-match-modal-close="true"></div>
+    <div class="relative w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div class="px-4 md:px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <p id="match-detail-date" class="text-xs font-semibold uppercase tracking-wide text-indigo-500">Match</p>
+          <h2 id="match-detail-title" class="text-lg md:text-xl font-semibold text-gray-900 truncate">Match Details</h2>
+        </div>
+        <button id="match-detail-close"
+                class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-gray-50 flex items-center justify-center shrink-0"
+                aria-label="Close match details">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div id="match-detail-body" class="modal-scroll overflow-y-auto p-4 md:p-6">
+        <p class="text-sm text-gray-400">Loading match…</p>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Individual court Match Insights modal -->
+  <div id="individual-insights-modal" class="fixed inset-0 z-[99] hidden items-center justify-center p-3 md:p-6">
+    <div class="absolute inset-0 bg-gray-950/65 backdrop-blur-sm" data-individual-insights-close="true"></div>
+    <div class="relative w-full max-w-4xl max-h-[92vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div class="px-4 md:px-6 py-4 border-b border-gray-100 grid grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-3">
+        <span aria-hidden="true"></span>
+        <div class="min-w-0 text-center">
+          <p id="individual-insights-position" class="text-[11px] font-semibold uppercase tracking-[0.08em] text-indigo-500">Individual Match</p>
+          <h2 id="individual-insights-title" class="text-lg md:text-xl font-semibold text-gray-900">Match Insights</h2>
+        </div>
+        <button id="individual-insights-close"
+                class="w-9 h-9 rounded-xl border border-gray-200 hover:bg-gray-50 flex items-center justify-center shrink-0"
+                aria-label="Close match insights">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div id="individual-insights-body" class="modal-scroll overflow-y-auto p-4 md:p-5 bg-gray-50/70">
+        <p class="text-sm text-gray-400 text-center py-6">Loading Match Insights…</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='collegeteams.js') }}"></script>
+  <script src="{{ url_for('static', filename='mobile-nav.js') }}"></script>
+  <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
 </body>
 </html>

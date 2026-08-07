@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rankings</title>
+
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='Logov3.png') }}" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet" />
+
+  <style>
+    .ranking-shell {
+      background:
+        radial-gradient(circle at top right, rgba(99, 102, 241, 0.08), transparent 28rem),
+        #f3f4f6;
+    }
+
+    .filter-control {
+      appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, #6b7280 50%),
+        linear-gradient(135deg, #6b7280 50%, transparent 50%);
+      background-position:
+        calc(100% - 17px) calc(50% - 2px),
+        calc(100% - 12px) calc(50% - 2px);
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      padding-right: 2.5rem;
+    }
+
+    .podium-card {
+      position: relative;
+      overflow: hidden;
+      transition: transform 180ms ease, box-shadow 180ms ease;
+    }
+
+    .podium-card:hover {
+      transform: translateY(-3px);
+    }
+
+    .podium-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 4px;
+      background: var(--podium-accent);
+    }
+
+    .podium-first {
+      --podium-accent: #eab308;
+      background: linear-gradient(180deg, rgba(254, 249, 195, 0.92), rgba(255,255,255,0.92));
+    }
+
+    .podium-second {
+      --podium-accent: #9ca3af;
+      background: linear-gradient(180deg, rgba(243,244,246,0.95), rgba(255,255,255,0.92));
+    }
+
+    .podium-third {
+      --podium-accent: #b45309;
+      background: linear-gradient(180deg, rgba(254, 243, 199, 0.72), rgba(255,255,255,0.92));
+    }
+
+    .rank-medal {
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.5), 0 5px 14px rgba(0,0,0,.08);
+    }
+
+    .rank-row {
+      transition: background-color 140ms ease, transform 140ms ease;
+    }
+
+    .rank-row:hover {
+      background-color: rgba(99, 102, 241, 0.045);
+    }
+
+    .rating-pill {
+      min-width: 4.5rem;
+    }
+
+    @media (max-width: 767px) {
+      html,
+      body {
+        max-width: 100%;
+        overflow-x: hidden;
+      }
+
+      main {
+        min-width: 0;
+        overflow-x: hidden;
+      }
+
+      .podium-grid {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .podium-first { order: 1; }
+      .podium-second { order: 2; }
+      .podium-third { order: 3; }
+
+      .mobile-hide {
+        display: none !important;
+      }
+
+      /* Mobile leaderboard: use fitted player cards instead of a wide table. */
+      .rankings-table-wrap {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden !important;
+        padding: 0.625rem;
+      }
+
+      .rankings-table {
+        display: block;
+        width: 100%;
+        max-width: 100%;
+        table-layout: fixed;
+      }
+
+      .rankings-table thead {
+        display: none;
+      }
+
+      .rankings-table tbody {
+        display: grid;
+        width: 100%;
+        gap: 0.5rem;
+      }
+
+      .rankings-table .rank-row {
+        display: grid;
+        grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+        align-items: center;
+        width: 100%;
+        min-width: 0;
+        border: 1px solid #e5e7eb;
+        border-radius: 0.875rem;
+        background: rgba(255,255,255,.88);
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(15,23,42,.035);
+      }
+
+      .rankings-table .rank-row:hover {
+        transform: none;
+        background: #fff;
+      }
+
+      .rankings-table .rank-row td {
+        display: block;
+        min-width: 0;
+        padding: 0.75rem 0.375rem;
+        border: 0;
+      }
+
+      .rankings-table .rank-row td:first-child {
+        padding-left: 0.625rem;
+        padding-right: 0;
+      }
+
+      .rankings-table .rank-row td:nth-child(2) {
+        overflow: hidden;
+      }
+
+      .rankings-table .rank-row td:nth-child(3) {
+        padding-left: 0.25rem;
+        padding-right: 0.625rem;
+        text-align: right;
+      }
+
+      .rankings-table .rank-row td:nth-child(n+4) {
+        display: none !important;
+      }
+
+      .rankings-table .rank-row a {
+        min-width: 0;
+        gap: 0.625rem;
+      }
+
+      .rankings-table .rank-row a > div:last-child {
+        min-width: 0;
+        overflow: hidden;
+      }
+
+      .rankings-table .rank-row img {
+        width: 2.5rem;
+        height: 2.5rem;
+      }
+
+      .rankings-table .rank-row p {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .rankings-table .rating-pill {
+        min-width: 0;
+        padding: 0.3rem 0.55rem;
+        font-size: 0.8125rem;
+        white-space: nowrap;
+      }
+    }
+  </style>
+</head>
+
+<body class="ranking-shell antialiased text-gray-900">
+  <!-- Loading Overlay -->
+  <div id="loading-overlay"
+       class="fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-300 ease-in-out bg-white/80 backdrop-blur-[2px]"
+       style="display:flex; opacity:1;">
+    <div class="text-center">
+      <svg class="animate-spin h-10 w-10 text-indigo-500 mx-auto mb-5"
+           xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+        <path class="opacity-75" fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+      <h2 class="text-xl font-semibold text-gray-800">Loading Rankings</h2>
+      <p class="text-sm text-gray-400 mt-1">Preparing leaderboard</p>
+    </div>
+  </div>
+
+  <div class="flex h-screen overflow-hidden sidebar-expanded" id="app">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar w-64 bg-white shadow-md flex flex-col transition-all duration-300">
+      <div class="flex items-center justify-between px-4 py-4 border-b border-gray-200">
+        <div class="flex items-center space-x-2">
+          <img src="{{ url_for('static', filename='Logov3.png') }}"
+               alt="Logo"
+               class="w-6 h-6 object-contain shrink-0" />
+          <span class="text-xl font-semibold sidebar-text" style="margin-left:6px;">Squash Stats</span>
+        </div>
+        <button onclick="toggleSidebar()"
+                class="toggle-btn p-1 hover:bg-gray-100 rounded-md transition-all"
+                aria-label="Toggle sidebar">
+          <i data-lucide="chevrons-left" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto mt-4 px-2 text-sm font-medium space-y-6">
+        <div>
+          <p class="text-gray-500 uppercase sidebar-text">Profile</p>
+          <ul class="mt-2 space-y-1">
+            <li>
+              <a href="/dashboard"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                <span class="sidebar-text">Dashboard</span>
+              </a>
+            </li>
+            <li>
+              <a href="/analytics"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="bar-chart" class="w-5 h-5"></i>
+                <span class="sidebar-text">Analytics</span>
+              </a>
+            </li>
+            <li>
+              <a href="/playertracker"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="user-round-search" class="w-5 h-5"></i>
+                <span class="sidebar-text">Advanced Player Tracker</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-gray-500 uppercase sidebar-text">Players</p>
+          <ul class="mt-2 space-y-1">
+            <li>
+              <a href="#"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="calendar" class="w-5 h-5"></i>
+                <span class="sidebar-text">Events
+                  <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span>
+                </span>
+              </a>
+            </li>
+<li>
+              <a href="/rankings"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-100 text-purple-600">
+                <i data-lucide="trophy" class="w-5 h-5"></i>
+                <span class="sidebar-text">Rankings</span>
+              </a>
+            </li>
+            <li>
+              <a href="/collegeteams"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="receipt-text" class="w-5 h-5"></i>
+                <span class="sidebar-text">College Teams</span>
+              </a>
+            </li>
+            <li>
+              <a href="#"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="columns-3" class="w-5 h-5"></i>
+                <span class="sidebar-text">Leagues
+                  <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span>
+                </span>
+              </a>
+            </li>
+            <li>
+              <a href="#"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="house" class="w-5 h-5"></i>
+                <span class="sidebar-text">Clubs
+                  <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span>
+                </span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-gray-500 uppercase sidebar-text">Other</p>
+          <ul class="mt-2 space-y-1">
+            <li>
+              <a href="#"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="life-buoy" class="w-5 h-5"></i>
+                <span class="sidebar-text">Help
+                  <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span>
+                </span>
+              </a>
+            </li>
+            <li>
+              <a href="#"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="settings" class="w-5 h-5"></i>
+                <span class="sidebar-text">Settings
+                  <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span>
+                </span>
+              </a>
+            </li>
+          </ul>
+        </div>
+
+        <div>
+          <p class="text-gray-500 uppercase sidebar-text mt-6">Contact</p>
+          <ul class="mt-2 space-y-1">
+            <li>
+              <a href="tel:301-347-8710"
+                 class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700">
+                <i data-lucide="phone" class="w-5 h-5"></i>
+                <span class="sidebar-text">Contact Us: 301-347-8710</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-8">
+      <!-- Header -->
+      <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 mb-5">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <h1 class="text-2xl md:text-3xl font-semibold tracking-tight">Rankings</h1>
+            <span class="inline-flex items-center gap-1 rounded-full bg-green-50 text-green-700 border border-green-100 px-2 py-1 text-xs font-semibold">
+              <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+              Live Data
+            </span>
+          </div>
+          <p class="text-sm text-gray-500">
+            Explore official player rankings by division.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 text-xs text-gray-500 bg-white/70 border border-gray-200 rounded-xl px-3 py-2 shadow-sm w-fit">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span id="api-status-text">Live US Squash rankings</span>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <section class="bg-white/75 backdrop-blur-md border border-gray-200 rounded-2xl p-4 md:p-5 shadow-xl mb-5">
+        <div class="flex flex-col md:flex-row md:items-end gap-3 md:gap-4">
+          <div class="flex-1">
+            <label for="division-filter" class="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+              Division
+            </label>
+            <select id="division-filter"
+                    class="filter-control w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+              <optgroup label="Overall">
+                <option value="1">All Women</option>
+                <option value="2" selected>All Men</option>
+              </optgroup>
+              <optgroup label="Boys Juniors">
+                <option value="3">BU11 Singles</option>
+                <option value="4">BU13 Singles</option>
+                <option value="5">BU15 Singles</option>
+                <option value="6">BU17 Singles</option>
+                <option value="7">BU19 Singles</option>
+              </optgroup>
+              <optgroup label="Girls Juniors">
+                <option value="10">GU11 Singles</option>
+                <option value="11">GU13 Singles</option>
+                <option value="12">GU15 Singles</option>
+                <option value="13">GU17 Singles</option>
+                <option value="14">GU19 Singles</option>
+              </optgroup>
+              <optgroup label="Men">
+                <option value="239">Men 19+ Singles</option>
+                <option value="18">Men 25+ Singles</option>
+                <option value="21">Men 30+ Singles</option>
+                <option value="22">Men 35+ Singles</option>
+                <option value="25">Men 40+ Singles</option>
+                <option value="26">Men 45+ Singles</option>
+                <option value="29">Men 50+ Singles</option>
+                <option value="30">Men 55+ Singles</option>
+                <option value="33">Men 60+ Singles</option>
+                <option value="34">Men 65+ Singles</option>
+                <option value="35">Men 70+ Singles</option>
+                <option value="36">Men 75+ Singles</option>
+                <option value="37">Men 80+ Singles</option>
+                <option value="181">Men 85+ Singles</option>
+              </optgroup>
+              <optgroup label="Women">
+                <option value="329">Women 19+ Singles</option>
+                <option value="42">Women 25+ Singles</option>
+                <option value="45">Women 30+ Singles</option>
+                <option value="46">Women 35+ Singles</option>
+                <option value="49">Women 40+ Singles</option>
+                <option value="50">Women 45+ Singles</option>
+                <option value="53">Women 50+ Singles</option>
+                <option value="178">Women 55+ Singles</option>
+                <option value="179">Women 60+ Singles</option>
+                <option value="180">Women 65+ Singles</option>
+                <option value="330">Women 70+ Singles</option>
+                <option value="331">Women 75+ Singles</option>
+                <option value="332">Women 80+ Singles</option>
+              </optgroup>
+            </select>
+          </div>
+
+          <button id="reset-filters"
+                  class="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors md:w-auto w-full">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+            Reset
+          </button>
+        </div>
+      </section>
+
+      <!-- Division Summary -->
+      <section class="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
+        <div class="bg-white/75 border border-gray-200 rounded-2xl p-4 shadow-sm">
+          <p class="text-xs uppercase tracking-wide text-gray-400 font-semibold">Division</p>
+          <p id="summary-division" class="text-lg font-bold text-gray-900 mt-1">All Men</p>
+        </div>
+        <div class="bg-white/75 border border-gray-200 rounded-2xl p-4 shadow-sm">
+          <p class="text-xs uppercase tracking-wide text-gray-400 font-semibold">Loaded</p>
+          <p id="summary-count" class="text-lg font-bold text-gray-900 mt-1">0</p>
+        </div>
+        <div class="col-span-2 lg:col-span-1 bg-white/75 border border-gray-200 rounded-2xl p-4 shadow-sm text-center lg:text-left">
+          <p class="text-xs uppercase tracking-wide text-gray-400 font-semibold">Showing</p>
+          <p id="summary-showing" class="text-lg font-bold text-indigo-600 mt-1">50</p>
+        </div>
+      </section>
+
+      <!-- Podium -->
+      <section class="bg-white/75 backdrop-blur-md border border-gray-200 rounded-2xl p-4 md:p-6 shadow-xl mb-5">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <h2 class="text-lg md:text-xl font-semibold text-gray-900">Top 3</h2>
+            <p class="text-sm text-gray-500 mt-0.5">Division leaders for the selected filters.</p>
+          </div>
+          <i data-lucide="trophy" class="w-6 h-6 text-yellow-500"></i>
+        </div>
+
+        <div id="podium-container" class="podium-grid grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 items-end">
+          <!-- Populated by JavaScript -->
+        </div>
+      </section>
+
+      <!-- Rankings Table -->
+      <section class="bg-white/80 backdrop-blur-md border border-gray-200 rounded-2xl shadow-xl overflow-hidden min-w-0">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-4 md:p-5 border-b border-gray-100">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">Leaderboard</h2>
+            <p id="leaderboard-subtitle" class="text-sm text-gray-500 mt-0.5">Top 50 players</p>
+          </div>
+
+          <div class="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 min-w-0">
+            <i data-lucide="arrow-down-wide-narrow" class="w-4 h-4"></i>
+            Official ranking order
+          </div>
+        </div>
+
+        <div class="rankings-table-wrap overflow-x-hidden md:overflow-x-auto">
+          <table class="rankings-table w-full text-left">
+            <thead>
+              <tr class="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-100 bg-gray-50/70">
+                <th class="px-4 md:px-5 py-3 font-semibold w-16">Rank</th>
+                <th class="px-3 py-3 font-semibold">Player</th>
+                <th class="px-3 py-3 font-semibold">Rating</th>
+                <th class="px-3 py-3 font-semibold mobile-hide">State</th>
+                <th class="px-3 py-3 font-semibold mobile-hide">Home Club</th>
+                <th class="px-3 py-3 font-semibold text-right mobile-hide">Points</th>
+                <th class="px-4 md:px-5 py-3 font-semibold text-right mobile-hide">Exposures</th>
+              </tr>
+            </thead>
+            <tbody id="rankings-body" class="divide-y divide-gray-100">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+
+        <div id="empty-state" class="hidden px-6 py-14 text-center">
+          <div class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="users" class="w-6 h-6 text-gray-400"></i>
+          </div>
+          <p class="font-semibold text-gray-700">No ranked players found</p>
+          <p class="text-sm text-gray-400 mt-1">Try another division or state.</p>
+        </div>
+
+        <div class="p-4 md:p-5 border-t border-gray-100 bg-gray-50/50">
+          <button id="load-more-btn"
+                  class="w-full sm:w-auto sm:min-w-[180px] mx-auto flex items-center justify-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-5 py-2.5 text-sm font-semibold shadow-sm transition-colors">
+            <span>Load 50 More</span>
+            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+          </button>
+
+          <p id="results-count" class="text-center text-xs text-gray-400 mt-2"></p>
+        </div>
+      </section>
+    </main>
+
+    <!-- Mobile Bottom Navigation -->
+    <div id="mobile-nav" class="mobile-bottom-nav md:hidden" role="navigation" aria-label="Mobile navigation">
+      <button class="mobile-nav-btn" data-target="/dashboard" aria-label="Dashboard">
+        <i data-lucide="home"></i><span>Dashboard</span>
+      </button>
+      <button class="mobile-nav-btn" data-target="/analytics" aria-label="Analytics">
+        <i data-lucide="bar-chart-2"></i><span>Analytics</span>
+      </button>
+<button class="mobile-nav-btn" data-target="/playertracker" aria-label="Tracker">
+        <i data-lucide="user"></i><span>Tracker</span>
+      </button>
+      <button class="mobile-nav-btn" data-target="/rankings" aria-label="Rankings">
+        <i data-lucide="trophy"></i><span>Rankings</span>
+      </button>
+      <button class="mobile-nav-btn" data-target="/collegeteams" aria-label="College Teams">
+        <i data-lucide="users"></i><span>College Teams</span>
+      </button>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='sidebar.js') }}"></script>
+  <script src="{{ url_for('static', filename='mobile-nav.js') }}"></script>
+
+  <script>
+    // =========================================================================
+    // LIVE US SQUASH RANKINGS
+    //
+    // Base API:
+    // https://api.ussquash.com/resources/rankings/1/current
+    //
+    // Examples:
+    // All states:
+    //   ?divisions=7&pageNumber=1
+    //
+    // Specific state:
+    //   ?divisions=7&pageNumber=1&stateId=1
+    //
+    // Every API page contains up to 50 ranking rows.
+    // =========================================================================
+
+    const RANKINGS_PROXY_BASE = "/proxy/rankings/1/current";
+    const RANKINGS_DIRECT_BASE = "https://api.ussquash.com/resources/rankings/1/current";
+    const API_PAGE_SIZE = 50;
+
+    const DIVISIONS = [
+      { id: 1, name: "All Women" },
+      { id: 2, name: "All Men" },
+      { id: 3, name: "BU11 Singles" },
+      { id: 4, name: "BU13 Singles" },
+      { id: 5, name: "BU15 Singles" },
+      { id: 6, name: "BU17 Singles" },
+      { id: 7, name: "BU19 Singles" },
+      { id: 10, name: "GU11 Singles" },
+      { id: 11, name: "GU13 Singles" },
+      { id: 12, name: "GU15 Singles" },
+      { id: 13, name: "GU17 Singles" },
+      { id: 14, name: "GU19 Singles" },
+      { id: 18, name: "Men 25+ Singles" },
+      { id: 21, name: "Men 30+ Singles" },
+      { id: 22, name: "Men 35+ Singles" },
+      { id: 25, name: "Men 40+ Singles" },
+      { id: 26, name: "Men 45+ Singles" },
+      { id: 29, name: "Men 50+ Singles" },
+      { id: 30, name: "Men 55+ Singles" },
+      { id: 33, name: "Men 60+ Singles" },
+      { id: 34, name: "Men 65+ Singles" },
+      { id: 35, name: "Men 70+ Singles" },
+      { id: 36, name: "Men 75+ Singles" },
+      { id: 37, name: "Men 80+ Singles" },
+      { id: 42, name: "Women 25+ Singles" },
+      { id: 45, name: "Women 30+ Singles" },
+      { id: 46, name: "Women 35+ Singles" },
+      { id: 49, name: "Women 40+ Singles" },
+      { id: 50, name: "Women 45+ Singles" },
+      { id: 53, name: "Women 50+ Singles" },
+      { id: 178, name: "Women 55+ Singles" },
+      { id: 179, name: "Women 60+ Singles" },
+      { id: 180, name: "Women 65+ Singles" },
+      { id: 181, name: "Men 85+ Singles" },
+      { id: 239, name: "Men 19+ Singles" },
+      { id: 329, name: "Women 19+ Singles" },
+      { id: 330, name: "Women 70+ Singles" },
+      { id: 331, name: "Women 75+ Singles" },
+      { id: 332, name: "Women 80+ Singles" }
+    ];
+
+    const DIVISION_LABELS = Object.fromEntries(
+      DIVISIONS.map(division => [String(division.id), division.name])
+    );
+
+    // Real US state IDs pulled from the supplied metadata.
+    const US_STATE_METADATA = [{"id": 1, "name": "Alabama", "abbr": "AL", "countryId": 220}, {"id": 2, "name": "Alaska", "abbr": "AK", "countryId": 220}, {"id": 3, "name": "American Samoa", "abbr": "AS", "countryId": 220}, {"id": 4, "name": "Arizona", "abbr": "AZ", "countryId": 220}, {"id": 5, "name": "Arkansas", "abbr": "AR", "countryId": 220}, {"id": 6, "name": "California", "abbr": "CA", "countryId": 220}, {"id": 7, "name": "Colorado", "abbr": "CO", "countryId": 220}, {"id": 8, "name": "Connecticut", "abbr": "CT", "countryId": 220}, {"id": 9, "name": "Delaware", "abbr": "DE", "countryId": 220}, {"id": 10, "name": "District Of Columbia", "abbr": "DC", "countryId": 220}, {"id": 12, "name": "Florida", "abbr": "FL", "countryId": 220}, {"id": 13, "name": "Georgia", "abbr": "GA", "countryId": 220}, {"id": 14, "name": "Guam", "abbr": "GU", "countryId": 220}, {"id": 15, "name": "Hawaii", "abbr": "HI", "countryId": 220}, {"id": 16, "name": "Idaho", "abbr": "ID", "countryId": 220}, {"id": 17, "name": "Illinois", "abbr": "IL", "countryId": 220}, {"id": 18, "name": "Indiana", "abbr": "IN", "countryId": 220}, {"id": 19, "name": "Iowa", "abbr": "IA", "countryId": 220}, {"id": 20, "name": "Kansas", "abbr": "KS", "countryId": 220}, {"id": 21, "name": "Kentucky", "abbr": "KY", "countryId": 220}, {"id": 22, "name": "Louisiana", "abbr": "LA", "countryId": 220}, {"id": 23, "name": "Maine", "abbr": "ME", "countryId": 220}, {"id": 25, "name": "Maryland", "abbr": "MD", "countryId": 220}, {"id": 26, "name": "Massachusetts", "abbr": "MA", "countryId": 220}, {"id": 27, "name": "Michigan", "abbr": "MI", "countryId": 220}, {"id": 28, "name": "Minnesota", "abbr": "MN", "countryId": 220}, {"id": 29, "name": "Mississippi", "abbr": "MS", "countryId": 220}, {"id": 30, "name": "Missouri", "abbr": "MO", "countryId": 220}, {"id": 31, "name": "Montana", "abbr": "MT", "countryId": 220}, {"id": 32, "name": "Nebraska", "abbr": "NE", "countryId": 220}, {"id": 33, "name": "Nevada", "abbr": "NV", "countryId": 220}, {"id": 34, "name": "New Hampshire", "abbr": "NH", "countryId": 220}, {"id": 35, "name": "New Jersey", "abbr": "NJ", "countryId": 220}, {"id": 36, "name": "New Mexico", "abbr": "NM", "countryId": 220}, {"id": 37, "name": "New York", "abbr": "NY", "countryId": 220}, {"id": 38, "name": "North Carolina", "abbr": "NC", "countryId": 220}, {"id": 39, "name": "North Dakota", "abbr": "ND", "countryId": 220}, {"id": 4411, "name": "Northern Mariana Islands (see also separate entry MP)", "abbr": "MP", "countryId": 220}, {"id": 41, "name": "Ohio", "abbr": "OH", "countryId": 220}, {"id": 42, "name": "Oklahoma", "abbr": "OK", "countryId": 220}, {"id": 43, "name": "Oregon", "abbr": "OR", "countryId": 220}, {"id": 45, "name": "Pennsylvania", "abbr": "PA", "countryId": 220}, {"id": 46, "name": "Puerto Rico", "abbr": "PR", "countryId": 220}, {"id": 47, "name": "Rhode Island", "abbr": "RI", "countryId": 220}, {"id": 48, "name": "South Carolina", "abbr": "SC", "countryId": 220}, {"id": 49, "name": "South Dakota", "abbr": "SD", "countryId": 220}, {"id": 50, "name": "Tennessee", "abbr": "TN", "countryId": 220}, {"id": 51, "name": "Texas", "abbr": "TX", "countryId": 220}, {"id": 4412, "name": "U.S. Minor Outlying Islands (cf. separate entry UM)", "abbr": "UM", "countryId": 220}, {"id": 52, "name": "Utah", "abbr": "UT", "countryId": 220}, {"id": 53, "name": "Vermont", "abbr": "VT", "countryId": 220}, {"id": 54, "name": "Virgin Islands", "abbr": "VI", "countryId": 220}, {"id": 55, "name": "Virginia", "abbr": "VA", "countryId": 220}, {"id": 56, "name": "Washington", "abbr": "WA", "countryId": 220}, {"id": 57, "name": "West Virginia", "abbr": "WV", "countryId": 220}, {"id": 58, "name": "Wisconsin", "abbr": "WI", "countryId": 220}, {"id": 59, "name": "Wyoming", "abbr": "WY", "countryId": 220}];
+
+    const STATE_BY_ID = Object.fromEntries(
+      US_STATE_METADATA.map(state => [String(state.id), state])
+    );
+
+    const DEFAULT_PROFILE =
+      "https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png";
+
+    const divisionFilter = document.getElementById("division-filter");
+    const resetFiltersBtn = document.getElementById("reset-filters");
+    const rankingsBody = document.getElementById("rankings-body");
+    const podiumContainer = document.getElementById("podium-container");
+    const loadMoreBtn = document.getElementById("load-more-btn");
+    const emptyState = document.getElementById("empty-state");
+    const apiStatusText = document.getElementById("api-status-text");
+
+    let activeDivision = "2";
+    let activePage = 1;
+    let isLoading = false;
+    let endReached = false;
+    let activeRequestToken = 0;
+    let loadedPlayers = [];
+    const loadedKeys = new Set();
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function safeNumber(value, fallback = null) {
+      if (value === null || value === undefined || value === "") {
+        return fallback;
+      }
+
+      const number = Number(value);
+      return Number.isFinite(number) ? number : fallback;
+    }
+
+    function formatPoints(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return "N/A";
+
+      return number.toLocaleString(undefined, {
+        maximumFractionDigits: 2
+      });
+    }
+
+    function normalizePlayer(raw) {
+      return {
+        ranking: safeNumber(raw.ranking),
+        season: raw.season || "",
+        division: raw.division || "",
+        type: raw.type || "",
+        lastName: raw.lastName || "",
+        firstName: raw.firstName || "",
+        rating: safeNumber(raw.rating),
+        exposures: safeNumber(raw.exposures, 0),
+        city: raw.city || "",
+        state: (raw.state || "").trim().toUpperCase(),
+        location: raw.location || "",
+        profilePictureUrl: raw.profilePictureUrl || DEFAULT_PROFILE,
+        playerId: raw.playerId,
+        age: safeNumber(raw.age),
+        ageUp: safeNumber(raw.ageUp),
+        dob: raw.dob || "",
+        gender: raw.gender || "",
+        avgTournaments: safeNumber(raw.avgTournaments, 0),
+        averagedPoints: safeNumber(raw.averagedPoints),
+        totalPoints: safeNumber(raw.totalPoints),
+        homeClub: raw.homeClub || ""
+      };
+    }
+
+    async function fetchJson(url) {
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error("Rankings response was not an array");
+      }
+
+      return data;
+    }
+
+    function buildRankingsQuery(divisionId, pageNumber) {
+      const params = new URLSearchParams({
+        divisions: String(divisionId),
+        pageNumber: String(pageNumber)
+      });
+
+      return params.toString();
+    }
+
+    async function fetchRankingsPage(divisionId, pageNumber) {
+      const query = buildRankingsQuery(divisionId, pageNumber);
+      const proxyUrl = `${RANKINGS_PROXY_BASE}?${query}`;
+
+      try {
+        return await fetchJson(proxyUrl);
+      } catch (proxyError) {
+        console.warn("Rankings proxy failed; trying direct US Squash API:", proxyError);
+
+        const directUrl = `${RANKINGS_DIRECT_BASE}?${query}`;
+        return await fetchJson(directUrl);
+      }
+    }
+
+    function appendPlayers(rows) {
+      rows.map(normalizePlayer).forEach(player => {
+        const key = `${player.playerId ?? "unknown"}:${player.ranking ?? "rankless"}`;
+
+        if (!loadedKeys.has(key)) {
+          loadedKeys.add(key);
+          loadedPlayers.push(player);
+        }
+      });
+
+      // Preserve the API's ranking order.
+      loadedPlayers.sort((a, b) => {
+        const rankA = Number.isFinite(a.ranking) ? a.ranking : Number.MAX_SAFE_INTEGER;
+        const rankB = Number.isFinite(b.ranking) ? b.ranking : Number.MAX_SAFE_INTEGER;
+        return rankA - rankB;
+      });
+    }
+
+    function medalStyles(rank) {
+      if (rank === 1) {
+        return {
+          cardClass: "podium-first",
+          icon: "crown",
+          medalBg: "bg-yellow-400",
+          medalText: "text-yellow-950",
+          label: "Gold"
+        };
+      }
+
+      if (rank === 2) {
+        return {
+          cardClass: "podium-second",
+          icon: "medal",
+          medalBg: "bg-gray-300",
+          medalText: "text-gray-800",
+          label: "Silver"
+        };
+      }
+
+      return {
+        cardClass: "podium-third",
+        icon: "medal",
+        medalBg: "bg-amber-700",
+        medalText: "text-white",
+        label: "Bronze"
+      };
+    }
+
+    function createPodiumCard(player, place) {
+      const styles = medalStyles(place);
+
+      const heightClass =
+        place === 1 ? "md:min-h-[258px]" :
+        place === 2 ? "md:min-h-[230px]" :
+        "md:min-h-[216px]";
+
+      const avatarSize = place === 1 ? "w-20 h-20" : "w-16 h-16";
+      const fullName = `${player.firstName} ${player.lastName}`.trim();
+      const location =
+        player.location ||
+        [player.city, player.state].filter(Boolean).join(", ") ||
+        "Location unavailable";
+
+      const club = player.homeClub || "Home club unavailable";
+      const rankingNote = `Overall #${player.ranking ?? place}`;
+
+      return `
+        <article class="podium-card ${styles.cardClass} ${heightClass} rounded-2xl border border-gray-200 p-4 md:p-5 flex flex-col justify-between shadow-sm">
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="rank-medal ${styles.medalBg} ${styles.medalText} w-10 h-10 rounded-full flex items-center justify-center font-black text-lg">
+                ${place}
+              </span>
+
+              <span class="inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+                <i data-lucide="${styles.icon}" class="w-4 h-4"></i>
+                ${styles.label}
+              </span>
+            </div>
+
+            <div class="flex md:flex-col items-center md:text-center gap-3">
+              <img src="${escapeHtml(player.profilePictureUrl || DEFAULT_PROFILE)}"
+                   onerror="this.onerror=null;this.src='${DEFAULT_PROFILE}'"
+                   alt="${escapeHtml(fullName)}"
+                   class="${avatarSize} rounded-full object-cover border-4 border-white shadow-md shrink-0" />
+
+              <div class="min-w-0">
+                <a href="/dashboard?userId=${encodeURIComponent(player.playerId ?? "")}"
+                   class="font-bold text-gray-900 hover:text-indigo-600 transition-colors md:text-lg block truncate">
+                  ${escapeHtml(fullName || "Unknown Player")}
+                </a>
+
+                <p class="text-xs font-semibold text-indigo-600 mt-0.5">
+                  ${escapeHtml(rankingNote)}
+                </p>
+
+                <p class="text-xs text-gray-500 mt-0.5">
+                  ${escapeHtml(location)}
+                </p>
+
+                <p class="text-xs text-gray-400 mt-0.5 truncate">
+                  ${escapeHtml(club)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-black/5 grid grid-cols-2 gap-3">
+            <div>
+              <p class="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">Rating</p>
+              <p class="text-xl font-black text-gray-900">
+                ${Number.isFinite(player.rating) ? player.rating.toFixed(2) : "N/A"}
+              </p>
+            </div>
+
+            <div class="text-right">
+              <p class="text-[11px] uppercase tracking-wide text-gray-400 font-semibold">Points</p>
+              <p class="text-sm font-bold text-gray-700">
+                ${formatPoints(player.totalPoints)}
+              </p>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderPodium() {
+      const topThree = loadedPlayers.slice(0, 3);
+
+      if (topThree.length === 0) {
+        podiumContainer.innerHTML = `
+          <div class="md:col-span-3 py-8 text-center text-sm text-gray-400">
+            No podium available for these filters.
+          </div>
+        `;
+        return;
+      }
+
+      // Desktop layout: silver, gold, bronze.
+      // Mobile CSS re-orders gold to appear first.
+      const ordered = topThree.length >= 3
+        ? [
+            { player: topThree[1], place: 2 },
+            { player: topThree[0], place: 1 },
+            { player: topThree[2], place: 3 }
+          ]
+        : topThree.map((player, index) => ({
+            player,
+            place: index + 1
+          }));
+
+      podiumContainer.innerHTML = ordered
+        .map(item => createPodiumCard(item.player, item.place))
+        .join("");
+    }
+
+    function rankBadge(rank) {
+      if (rank === 1) {
+        return `<span class="w-8 h-8 rounded-full bg-yellow-100 text-yellow-700 flex items-center justify-center font-black">1</span>`;
+      }
+
+      if (rank === 2) {
+        return `<span class="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center font-black">2</span>`;
+      }
+
+      if (rank === 3) {
+        return `<span class="w-8 h-8 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-black">3</span>`;
+      }
+
+      return `
+        <span class="w-8 h-8 flex items-center justify-center font-bold text-gray-500">
+          ${escapeHtml(rank ?? "—")}
+        </span>
+      `;
+    }
+
+    function createRankingRow(player) {
+      const fullName = `${player.firstName} ${player.lastName}`.trim();
+
+      const mobileMeta = [
+        player.state || null,
+        Number.isFinite(player.age) ? `${player.age} yrs` : null
+      ].filter(Boolean).join(" · ");
+
+      return `
+        <tr class="rank-row">
+          <td class="px-4 md:px-5 py-3.5">
+            ${rankBadge(player.ranking)}
+          </td>
+
+          <td class="px-3 py-3.5">
+            <a href="/dashboard?userId=${encodeURIComponent(player.playerId ?? "")}"
+               class="flex items-center gap-3 group">
+              <img src="${escapeHtml(player.profilePictureUrl || DEFAULT_PROFILE)}"
+                   onerror="this.onerror=null;this.src='${DEFAULT_PROFILE}'"
+                   alt="${escapeHtml(fullName)}"
+                   class="w-9 h-9 rounded-full object-cover border border-gray-200 shrink-0" />
+
+              <div class="min-w-0">
+                <p class="font-semibold text-sm text-gray-800 group-hover:text-indigo-600 transition-colors truncate">
+                  ${escapeHtml(fullName || "Unknown Player")}
+                </p>
+
+                <p class="text-xs text-gray-400 md:hidden">
+                  ${escapeHtml(mobileMeta || "Player")}
+                </p>
+              </div>
+            </a>
+          </td>
+
+          <td class="px-3 py-3.5">
+            <span class="rating-pill inline-flex justify-center rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-1 text-sm font-bold">
+              ${Number.isFinite(player.rating) ? player.rating.toFixed(2) : "N/A"}
+            </span>
+          </td>
+
+          <td class="px-3 py-3.5 text-sm text-gray-600 mobile-hide">
+            ${escapeHtml(player.state || "N/A")}
+          </td>
+
+          <td class="px-3 py-3.5 text-sm text-gray-500 mobile-hide">
+            ${escapeHtml(player.homeClub || "N/A")}
+          </td>
+
+          <td class="px-3 py-3.5 text-sm text-gray-700 text-right mobile-hide font-semibold">
+            ${formatPoints(player.totalPoints)}
+          </td>
+
+          <td class="px-4 md:px-5 py-3.5 text-sm text-gray-500 text-right mobile-hide">
+            ${escapeHtml(player.exposures)}
+          </td>
+        </tr>
+      `;
+    }
+
+    function updateSummary() {
+      document.getElementById("summary-division").textContent =
+        DIVISION_LABELS[activeDivision] || `Division ${activeDivision}`;
+
+      document.getElementById("summary-count").textContent =
+        loadedPlayers.length.toLocaleString();
+
+      document.getElementById("summary-showing").textContent =
+        loadedPlayers.length.toLocaleString();
+
+      document.getElementById("leaderboard-subtitle").textContent =
+        `${DIVISION_LABELS[activeDivision] || activeDivision}`;
+
+      document.getElementById("results-count").textContent =
+        loadedPlayers.length === 0
+          ? ""
+          : `Showing ${loadedPlayers.length} players`;
+    }
+
+    function renderRankings() {
+      renderPodium();
+      updateSummary();
+
+      rankingsBody.innerHTML =
+        loadedPlayers.map(createRankingRow).join("");
+
+      const noResults = loadedPlayers.length === 0 && endReached;
+      emptyState.classList.toggle("hidden", !noResults);
+
+      if (noResults) {
+        loadMoreBtn.classList.add("hidden");
+      } else {
+        loadMoreBtn.classList.remove("hidden");
+
+        if (endReached) {
+          loadMoreBtn.disabled = true;
+          loadMoreBtn.innerHTML = `
+            <span>All Players Loaded</span>
+            <i data-lucide="check" class="w-4 h-4"></i>
+          `;
+        } else {
+          loadMoreBtn.disabled = false;
+          loadMoreBtn.innerHTML = `
+            <span>Load 50 More</span>
+            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+          `;
+        }
+      }
+
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+
+    function setLoadingState(loading, label = "Loading rankings...") {
+      isLoading = loading;
+      divisionFilter.disabled = loading;
+      resetFiltersBtn.disabled = loading;
+      loadMoreBtn.disabled = loading;
+
+      if (apiStatusText) {
+        apiStatusText.textContent = loading
+          ? label
+          : "Live US Squash rankings";
+      }
+
+      if (loading) {
+        loadMoreBtn.innerHTML = `
+          <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span>Loading...</span>
+        `;
+      }
+    }
+
+    function renderError(error) {
+      console.error("Rankings error:", error);
+
+      if (apiStatusText) {
+        apiStatusText.textContent = "Rankings API unavailable";
+      }
+
+      document.getElementById("results-count").textContent =
+        `Error: ${error.message}`;
+
+      if (loadedPlayers.length === 0) {
+        rankingsBody.innerHTML = "";
+
+        podiumContainer.innerHTML = `
+          <div class="md:col-span-3 py-8 text-center">
+            <div class="w-12 h-12 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-3">
+              <i data-lucide="triangle-alert" class="w-6 h-6"></i>
+            </div>
+            <p class="font-semibold text-gray-800">Could not load rankings</p>
+            <p class="text-sm text-gray-500 mt-1">
+              Check the rankings proxy/API connection and try again.
+            </p>
+          </div>
+        `;
+      }
+
+      loadMoreBtn.classList.remove("hidden");
+      loadMoreBtn.disabled = false;
+      loadMoreBtn.innerHTML = `
+        <span>Try Again</span>
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      `;
+
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+    }
+
+    function resetLeaderboardState() {
+      activePage = 1;
+      endReached = false;
+      loadedPlayers = [];
+      loadedKeys.clear();
+
+      rankingsBody.innerHTML = "";
+      emptyState.classList.add("hidden");
+    }
+
+    async function loadPage(pageNumber, { replace = false } = {}) {
+      if (isLoading) return;
+
+      const requestToken = ++activeRequestToken;
+
+      if (replace) {
+        resetLeaderboardState();
+        pageNumber = 1;
+      }
+
+      activeDivision = divisionFilter.value;
+
+      setLoadingState(true, "Loading rankings...");
+
+      try {
+        const rows = await fetchRankingsPage(
+          activeDivision,
+          pageNumber
+        );
+
+        if (requestToken !== activeRequestToken) return;
+
+        appendPlayers(rows);
+
+        activePage = pageNumber;
+
+        if (rows.length < API_PAGE_SIZE) {
+          endReached = true;
+        }
+
+        renderRankings();
+      } catch (error) {
+        if (requestToken !== activeRequestToken) return;
+        renderError(error);
+      } finally {
+        if (requestToken === activeRequestToken) {
+          setLoadingState(false);
+          renderRankings();
+        }
+      }
+    }
+
+    divisionFilter.addEventListener("change", () => {
+      loadPage(1, { replace: true });
+    });
+
+    resetFiltersBtn.addEventListener("click", () => {
+      divisionFilter.value = "2";
+      loadPage(1, { replace: true });
+    });
+
+    loadMoreBtn.addEventListener("click", () => {
+      if (isLoading || endReached) return;
+      loadPage(activePage + 1);
+    });
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+
+      const loadingOverlay = document.getElementById("loading-overlay");
+
+      try {
+        await loadPage(1, { replace: true });
+      } finally {
+        if (loadingOverlay) {
+          loadingOverlay.style.opacity = "0";
+
+          setTimeout(() => {
+            loadingOverlay.style.display = "none";
+          }, 300);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
