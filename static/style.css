@@ -185,6 +185,17 @@ main {
 #graph-modal.mi-open { animation: mi-fade-in 0.15s ease-out; }
 #graph-modal.mi-open > div { animation: mi-pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
 
+/* Match list modal (analytics) - same pop-in animation as Match Insights */
+#match-list-modal.mi-open { animation: mi-fade-in 0.15s ease-out; }
+#match-list-modal.mi-open > div { animation: mi-pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Team preview + division preview modals (college teams) - same pop-in animation */
+/* These modals have a backdrop div + card container, so animate only the card (last child) */
+#team-preview-modal.mi-open { animation: mi-fade-in 0.15s ease-out; }
+#team-preview-modal.mi-open > div:last-child { animation: mi-pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+#division-preview-modal.mi-open { animation: mi-fade-in 0.15s ease-out; }
+#division-preview-modal.mi-open > div:last-child { animation: mi-pop-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+
 .mi-header {
   background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
 }
@@ -521,5 +532,82 @@ main {
   /* Add padding to completed matches widget on mobile to prevent button from being blocked */
   .completed-matches-widget {
     padding-bottom: 120px; /* Extra padding to account for mobile nav bar */
+  }
+}
+
+/* Chart wrapper used by both the Overview bar chart and per-game line
+   charts. Gives Chart.js a real, non-collapsing box to size against
+   (required for responsive + maintainAspectRatio:false to work), and is
+   sized larger on mobile since the modal is now a full-screen sheet. */
+.mi-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 300px;
+}
+
+/* ===================== Match Insights Modal - Mobile ===================== */
+@media (max-width: 767px) {
+  /* Turn the centered card into a full-screen sheet so there's no wasted
+     edge padding and the whole viewport is usable for tabs/charts */
+  #graph-modal {
+    padding: 0;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+
+  #graph-modal > div {
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    margin: 0;
+  }
+
+  #graph-modal .mi-header {
+    border-radius: 0;
+    padding-top: max(env(safe-area-inset-top), 1rem);
+  }
+
+  /* Leave room at the bottom so content isn't hidden behind the floating
+     mobile nav bar / thumb area */
+  #graph-modal .p-5.sm\:p-6 {
+    padding-bottom: 140px;
+  }
+
+  /* Game tabs: center them when they all fit on screen (few games), and
+     scroll smoothly with nothing clipped off when there are too many to
+     fit (text-align + inline-flex avoids the "safe centering" clipping
+     issue that flexbox justify-content:center has on overflow) */
+  #graph-modal .mi-tab-nav {
+    display: block;
+    white-space: nowrap;
+    text-align: center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  #graph-modal .mi-tab-nav::-webkit-scrollbar { display: none; }
+
+  #graph-modal .mi-tab-btn {
+    display: inline-flex;
+    vertical-align: middle;
+  }
+
+  /* Stat chips: two per row, but don't let a lone leftover chip
+     (e.g. "Longest Point" on its own line) stretch full-width -
+     keep it a compact centered chip like the others */
+  #graph-modal .mi-stat-card {
+    flex: 0 1 47%;
+    min-width: 140px;
+  }
+
+  #graph-modal .mi-score-card {
+    padding: 0.9rem 0.85rem;
+  }
+
+  /* Bigger charts now that there's a full screen of room to use */
+  #graph-modal .mi-chart-wrap {
+    height: 320px;
   }
 }

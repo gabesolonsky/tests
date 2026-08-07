@@ -238,20 +238,22 @@ function createDivisionPreviewModal() {
   wrap.id = 'division-preview-modal';
   wrap.className = 'fixed inset-0 z-50 hidden items-center justify-center';
   wrap.innerHTML = `
-    <div class="fixed inset-0 bg-black/40" data-close="true"></div>
+    <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" data-close="true"></div>
     <div class="relative w-full max-w-2xl mx-4">
-      <div class="bg-white rounded-xl shadow-xl overflow-hidden border-t-2 border-purple-600">
-        <div class="p-5">
-          <div id="division-preview-title" class="flex items-start justify-between gap-4">
-            <div>
-              <h3 id="division-preview-name" class="text-lg font-semibold text-gray-800">Division</h3>
-              <p id="division-preview-season" class="text-xs text-gray-500 mt-1">Season</p>
-            </div>
-            <div class="flex-shrink-0">
-              <button id="division-preview-close" class="inline-flex items-center gap-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">Close</button>
-            </div>
+      <div class="bg-white rounded-2xl shadow-2xl overflow-hidden relative">
+        <div class="mi-header flex items-center justify-between px-5 py-4 sm:px-6 rounded-t-2xl">
+          <div>
+            <h3 id="division-preview-name" class="text-lg font-semibold text-white">Division</h3>
+            <p id="division-preview-season" class="text-xs text-white/80 mt-0.5">Season</p>
           </div>
-          <div id="division-preview-body" class="mt-4 grid gap-3">
+          <div class="flex-shrink-0">
+            <button id="division-preview-close" class="mi-close-btn" aria-label="Close">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="p-5 sm:p-6">
+          <div id="division-preview-body" class="grid gap-3">
             <p class="text-sm text-gray-500">Loading preview…</p>
           </div>
           <div class="mt-4 flex gap-2 justify-end">
@@ -295,23 +297,25 @@ function createTeamPreviewModal() {
   wrap.id = 'team-preview-modal';
   wrap.className = 'fixed inset-0 z-50 hidden items-center justify-center';
   wrap.innerHTML = `
-    <div class="fixed inset-0 bg-black/40" data-close="true"></div>
+    <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" data-close="true"></div>
     <div class="relative w-full max-w-4xl mx-auto">
-      <div class="bg-white rounded-xl shadow-xl overflow-hidden border-t-2 border-purple-600">
-        <div class="p-6">
-          <div class="flex items-start justify-between gap-4">
-            <div class="flex items-center gap-3">
-              <img id="team-preview-logo" src="" alt="" class="w-12 h-12 rounded-full object-cover hidden" />
-              <div>
-                <h3 id="team-preview-name" class="text-lg font-semibold text-gray-800">Team</h3>
-                <p id="team-preview-sub" class="text-xs text-gray-500 mt-1">Roster</p>
-              </div>
-            </div>
-            <div class="flex-shrink-0">
-              <button id="team-preview-close" class="inline-flex items-center gap-2 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">Close</button>
+      <div class="bg-white rounded-2xl shadow-2xl overflow-hidden relative">
+        <div class="mi-header flex items-center justify-between px-5 py-4 sm:px-6 rounded-t-2xl">
+          <div class="flex items-center gap-3">
+            <img id="team-preview-logo" src="" alt="" class="w-12 h-12 rounded-full object-cover hidden ring-2 ring-white/30" />
+            <div>
+              <h3 id="team-preview-name" class="text-lg font-semibold text-white">Team</h3>
+              <p id="team-preview-sub" class="text-xs text-white/80 mt-0.5">Roster</p>
             </div>
           </div>
-          <div id="team-preview-body" class="mt-4 grid gap-3">
+          <div class="flex-shrink-0">
+            <button id="team-preview-close" class="mi-close-btn" aria-label="Close">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="p-5 sm:p-6">
+          <div id="team-preview-body" class="grid gap-3">
             <!-- two column layout: roster (left) and schedule (right) -->
             <div id="team-preview-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div id="team-preview-roster" class="overflow-y-auto pr-3">
@@ -369,6 +373,10 @@ function showTeamPreview(teamId, teamName, teamLogo, winsLossesDisplay = '', ind
   wrap.setAttribute('data-team-logo', teamLogo || '');
   wrap.classList.remove('hidden');
   wrap.classList.add('flex');
+  wrap.classList.remove('mi-open');
+  void wrap.offsetWidth; // restart the pop-in animation
+  wrap.classList.add('mi-open');
+  document.body.classList.add('no-scroll');
   // Reset per-open predictor state so a previous team's cached roster/opponent list doesn't leak in
   wrap.__teamAPlayers = [];
   wrap.__opponentCache = {};
@@ -498,7 +506,12 @@ function predictTeamMatch(teamAPlayers, teamBPlayers) {
 
 function hideTeamPreview() {
   const wrap = document.getElementById('team-preview-modal');
-  if (wrap) { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
+  if (wrap) {
+    wrap.classList.add('hidden');
+    wrap.classList.remove('flex');
+    wrap.classList.remove('mi-open');
+    document.body.classList.remove('no-scroll');
+  }
 }
 
 function showDivisionPreview(divisionId) {
@@ -507,6 +520,10 @@ function showDivisionPreview(divisionId) {
   wrap.setAttribute('data-division', divisionId);
   wrap.classList.remove('hidden');
   wrap.classList.add('flex');
+  wrap.classList.remove('mi-open');
+  void wrap.offsetWidth; // restart the pop-in animation
+  wrap.classList.add('mi-open');
+  document.body.classList.add('no-scroll');
   const titleEl = document.getElementById('division-preview-name');
   const seasonEl = document.getElementById('division-preview-season');
   const body = document.getElementById('division-preview-body');
@@ -550,7 +567,12 @@ function showDivisionPreview(divisionId) {
 
 function hideDivisionPreview() {
   const wrap = document.getElementById('division-preview-modal');
-  if (wrap) { wrap.classList.add('hidden'); wrap.classList.remove('flex'); }
+  if (wrap) {
+    wrap.classList.add('hidden');
+    wrap.classList.remove('flex');
+    wrap.classList.remove('mi-open');
+    document.body.classList.remove('no-scroll');
+  }
 }
 
 function renderTeams(containerId, teams, divisionId) {
@@ -875,7 +897,178 @@ async function fetchDivisionSchedule(divisionId) {
     container.innerHTML = '<p class="text-red-500">Failed to load standings.</p>';
   }
 }
+// ---- PREDICTOR LOGIC ----
+      // We'll populate the team dropdowns using the global __teamsByDivision
+      // from collegeteams.js. If not ready, we'll wait.
 
+      function populateTeamDropdowns() {
+        const teamA = document.getElementById('team-a-select');
+        const teamB = document.getElementById('team-b-select');
+        // Clear existing options (keep first "Choose team...")
+        teamA.innerHTML = '<option value="">Choose team...</option>';
+        teamB.innerHTML = '<option value="">Choose team...</option>';
+
+        const allTeams = [];
+        // __teamsByDivision is populated by collegeteams.js after standings load
+        if (window.__teamsByDivision) {
+          for (const divId in window.__teamsByDivision) {
+            const teams = window.__teamsByDivision[divId];
+            teams.forEach(t => {
+              if (t.id && t.name) {
+                allTeams.push({ id: t.id, name: t.name });
+              }
+            });
+          }
+        }
+
+        // Remove duplicates by id
+        const unique = Array.from(new Map(allTeams.map(t => [t.id, t])).values());
+        unique.sort((a,b) => a.name.localeCompare(b.name));
+
+        unique.forEach(t => {
+          const optA = document.createElement('option');
+          optA.value = t.id;
+          optA.textContent = t.name;
+          teamA.appendChild(optA.cloneNode(true));
+          teamB.appendChild(optA);
+        });
+      }
+
+      // Poll until __teamsByDivision is ready
+      let attempts = 0;
+      const interval = setInterval(() => {
+        if (window.__teamsByDivision && Object.keys(window.__teamsByDivision).length > 0) {
+          populateTeamDropdowns();
+          clearInterval(interval);
+        } else if (++attempts > 10) {
+          clearInterval(interval);
+          // Fallback: try to fetch teams manually
+          fetchTeamsManually();
+        }
+      }, 500);
+
+      async function fetchTeamsManually() {
+        try {
+          const res = await fetch('/proxy/leagues/info/2200');
+          if (!res.ok) throw new Error('Failed to fetch teams');
+          const data = await res.json();
+          const teams = Array.isArray(data) ? data : (data.leagues || []);
+          // Store in global for later use
+          window.__teamsByDivision = window.__teamsByDivision || {};
+          // Group by division? For simplicity, just put all in a dummy key
+          window.__teamsByDivision['all'] = teams.map(t => ({
+            id: t.TeamId || t.ClubId || t.id,
+            name: t.TeamDescr || t.ClubDescr || t.Name || ''
+          })).filter(t => t.id && t.name);
+          populateTeamDropdowns();
+        } catch(e) {
+          console.error('Manual team fetch failed', e);
+        }
+      }
+
+      // ---- Prediction function ----
+      async function predictMatch(teamAId, teamBId) {
+        const resultDiv = document.getElementById('prediction-result');
+        const errorDiv = document.getElementById('prediction-error');
+        const scoreSpan = document.getElementById('prediction-score');
+        const detailsDiv = document.getElementById('prediction-details');
+
+        resultDiv.classList.add('hidden');
+        errorDiv.classList.add('hidden');
+
+        if (!teamAId || !teamBId || teamAId === teamBId) {
+          errorDiv.textContent = 'Please select two different teams.';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+
+        try {
+          // Fetch rosters for both teams
+          const [rosterA, rosterB] = await Promise.all([
+            fetch(`/proxy/teams/${teamAId}/players`).then(r => r.ok ? r.json() : []),
+            fetch(`/proxy/teams/${teamBId}/players`).then(r => r.ok ? r.json() : [])
+          ]);
+
+          // Extract ratings (try various fields)
+          const extractRating = (p) => {
+            const r = p.CurrentRating ?? p.Rating ?? p.RatingValue ?? p.RatingOther ?? null;
+            const num = typeof r === 'number' ? r : parseFloat(r);
+            return isNaN(num) ? null : num;
+          };
+
+          const playersA = (Array.isArray(rosterA) ? rosterA : (rosterA.players || rosterA.PlayerList || [])).map(p => ({
+            name: p.player || p.PlayerName || p.Name || 'Unknown',
+            rating: extractRating(p)
+          })).filter(p => p.rating !== null);
+
+          const playersB = (Array.isArray(rosterB) ? rosterB : (rosterB.players || rosterB.PlayerList || [])).map(p => ({
+            name: p.player || p.PlayerName || p.Name || 'Unknown',
+            rating: extractRating(p)
+          })).filter(p => p.rating !== null);
+
+          // Sort by rating descending, take top 9
+          const sortedA = playersA.sort((a,b) => b.rating - a.rating).slice(0,9);
+          const sortedB = playersB.sort((a,b) => b.rating - a.rating).slice(0,9);
+
+          if (sortedA.length === 0 || sortedB.length === 0) {
+            errorDiv.textContent = 'One or both teams have no rated players.';
+            errorDiv.classList.remove('hidden');
+            return;
+          }
+
+          // Pair up (up to 9 matchups)
+          const maxMatches = Math.min(sortedA.length, sortedB.length);
+          let teamAWins = 0, teamBWins = 0;
+          const matchups = [];
+          for (let i = 0; i < maxMatches; i++) {
+            const a = sortedA[i];
+            const b = sortedB[i];
+            let winner = null;
+            if (a.rating > b.rating) { teamAWins++; winner = 'A'; }
+            else if (b.rating > a.rating) { teamBWins++; winner = 'B'; }
+            else { winner = 'tie'; } // treat as tie, but we'll add a draw indicator
+            matchups.push({
+              playerA: a.name,
+              ratingA: a.rating,
+              playerB: b.name,
+              ratingB: b.rating,
+              winner
+            });
+          }
+
+          // Build result HTML
+          const score = `${teamAWins} – ${teamBWins}`;
+          scoreSpan.textContent = score;
+
+          let html = '<div class="font-semibold text-gray-700 mt-2 mb-1">Matchups</div>';
+          matchups.forEach((m, idx) => {
+            const winClass = m.winner === 'A' ? 'text-green-600' : (m.winner === 'B' ? 'text-red-600' : 'text-yellow-600');
+            const resultText = m.winner === 'A' ? '✅' : (m.winner === 'B' ? '❌' : '⚖️');
+            html += `
+              <div class="matchup-row">
+                <div class="text-right">
+                  <span class="font-medium">${m.playerA}</span>
+                  <span class="player-rating">(${m.ratingA.toFixed(2)})</span>
+                </div>
+                <div class="text-center ${winClass} font-bold">${resultText}</div>
+                <div class="text-left">
+                  <span class="font-medium">${m.playerB}</span>
+                  <span class="player-rating">(${m.ratingB.toFixed(2)})</span>
+                </div>
+              </div>
+            `;
+          });
+
+          detailsDiv.innerHTML = html;
+          resultDiv.classList.remove('hidden');
+
+        } catch (err) {
+          console.error('Prediction error:', err);
+          errorDiv.textContent = 'Failed to fetch team data. Please try again.';
+          errorDiv.classList.remove('hidden');
+        }
+      }
+      
 function setupBackButton() {
   const back = document.getElementById('back-to-list');
   if (back) back.onclick = () => document.getElementById('division-details').classList.add('hidden');

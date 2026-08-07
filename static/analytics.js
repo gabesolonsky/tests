@@ -205,9 +205,9 @@ async function fetchWeeklyRankings(currentUserId) {
                 if (previousRank !== undefined) {
                     const change = previousRank - ranking.Ranking;
                     if (change > 0) {
-                        changeHtml = `<div class="flex items-center gap-1 text-green-600"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg><span class="text-xs font-medium">${change}</span></div>`;
+                        changeHtml = `<div class="flex items-center gap-1 text-green-600"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg><span class="text-xs font-medium">+${change}</span></div>`;
                     } else if (change < 0) {
-                        changeHtml = `<div class="flex items-center gap-1 text-red-600"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7 7 7-7"/><path d="M12 5v14"/></svg><span class="text-xs font-medium">${Math.abs(change)}</span></div>`;
+                        changeHtml = `<div class="flex items-center gap-1 text-red-600"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7 7 7-7"/><path d="M12 5v14"/></svg><span class="text-xs font-medium">${change}</span></div>`;
                     } else {
                         changeHtml = `<div class="text-xs text-gray-400">-</div>`;
                     }
@@ -424,8 +424,22 @@ async function fetchAndDisplayMonthlyRatingChanges(currentUserId, allMatches) {
  * (oid1 === uid), the opponent is the home player, so we use w1Rating.
  */
 function getOpponentRatingFromMatch(match, uid) {
-    if (match.wid1 === uid) return parseFloat(match.o1Rating); // user home -> opponent is visitor
-    if (match.oid1 === uid) return parseFloat(match.w1Rating); // user visiting -> opponent is home
+    const numericUid = Number(uid);
+    const homeId = Number(match.wid1);
+    const visitingId = Number(match.oid1);
+
+    if (Number.isFinite(homeId) && homeId === numericUid) return parseFloat(match.o1Rating); // user home -> opponent is visitor
+    if (Number.isFinite(visitingId) && visitingId === numericUid) return parseFloat(match.w1Rating); // user visiting -> opponent is home
+    return NaN;
+}
+
+function getUserRatingFromMatch(match, uid) {
+    const numericUid = Number(uid);
+    const homeId = Number(match.wid1);
+    const visitingId = Number(match.oid1);
+
+    if (Number.isFinite(homeId) && homeId === numericUid) return parseFloat(match.w1Rating);
+    if (Number.isFinite(visitingId) && visitingId === numericUid) return parseFloat(match.o1Rating);
     return NaN;
 }
 
@@ -620,52 +634,131 @@ function formatDurationSec(totalSeconds) {
  * @param {Array} allMatches - An array of the user's matches.
  */
 
-async function fetchAdvancedMatchInsights(allMatches) {
+const liveScoreDetailsCache = new Map();
+
+async function fetchLiveScoreDetailsCached(matchId) {
+    const key = String(matchId || '');
+    if (!key) return [];
+
+    if (!liveScoreDetailsCache.has(key)) {
+        const request = fetch(`/proxy/liveScoreDetails?match_id=${encodeURIComponent(key)}`, { signal: abortController.signal })
+            .then(async res => {
+                if (!res.ok) throw new Error(`Live score HTTP ${res.status}`);
+                const data = await res.json();
+                return Array.isArray(data) ? data : [];
+            })
+            .catch(error => {
+                if (error.name !== 'AbortError') {
+                    console.warn(`Unable to load live score details for match ${key}:`, error);
+                }
+                return [];
+            });
+        liveScoreDetailsCache.set(key, request);
+    }
+
+    return liveScoreDetailsCache.get(key);
+}
+
+async function asyncMapWithConcurrency(items, limit, worker) {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+
+    async function runWorker() {
+        while (nextIndex < items.length) {
+            const index = nextIndex++;
+            results[index] = await worker(items[index], index);
+        }
+    }
+
+    const workerCount = Math.min(Math.max(1, limit), items.length || 1);
+    await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+    return results;
+}
+
+async function fetchAdvancedMatchInsights(allMatches, currentUserId) {
     const insightIds = ['average-match-length', 'longest-match-length', 'shortest-match-length', 'average-point-length', 'longest-point-length', 'shortest-point-length'];
     insightIds.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.textContent = 'Loading...';
     });
 
+    const durationStatus = document.getElementById('match-duration-distribution-status');
+    if (durationStatus) durationStatus.textContent = 'Loading match timing data...';
+
     if (!allMatches || allMatches.length === 0) {
         insightIds.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.textContent = 'N/A';
         });
+        renderMatchDurationDistribution([]);
+        renderPerformanceByDayAndTime([], currentUserId, new Map());
         return;
     }
 
-    let matchesWithInsights = [];
+    const matchesWithInsights = [];
     const pointLengths = [];
+    const durationDistributionSeconds = [];
+    const startTimesByMatchId = new Map();
     const MIN_POINT_DURATION_SEC = 4;
     const MAX_POINT_DURATION_SEC = 150;
     const MIN_MATCH_DURATION_SEC = 240;
 
-    await Promise.all(allMatches.map(async (match) => {
-        try {
-            const res = await fetch(`/proxy/liveScoreDetails?match_id=${match.Matchid}`, { signal: abortController.signal });
-            if (!res.ok) return;
-            const details = await res.json();
-            if (!details || details.length < 2) return;
-            const allPoints = details.filter(evt => evt.Decision === "point").sort((a, b) => new Date(a.StartDate) - new Date(b.StartDate));
-            if (allPoints.length < 2) return;
+    // If the match payload exposes HasLiveScore, only those matches can have
+    // point-by-point timing data. This avoids hammering the endpoint with
+    // requests for matches that cannot return duration/start-time details.
+    const hasLiveScoreFlag = allMatches.some(match => match && match.HasLiveScore !== undefined && match.HasLiveScore !== null);
+    const timingCandidateMatches = hasLiveScoreFlag
+        ? allMatches.filter(match => {
+            const value = match && match.HasLiveScore;
+            return value === true || value === 1 || String(value).toLowerCase() === 'true';
+        })
+        : allMatches;
 
-            const matchStart = new Date(allPoints[0].StartDate);
-            const matchEnd = new Date(allPoints[allPoints.length - 1].StartDate);
-            const matchDurationSec = (matchEnd - matchStart) / 1000;
+    // Limit concurrency so the live-score endpoint is not hit by hundreds of
+    // simultaneous requests. The cached helper also prevents duplicate calls
+    // when the same match is opened in the details modal later.
+    await asyncMapWithConcurrency(timingCandidateMatches, 5, async match => {
+        if (!match || !match.Matchid) return;
 
-            if (matchDurationSec >= MIN_MATCH_DURATION_SEC) {
-                matchesWithInsights.push({ duration: matchDurationSec, match: match });
+        const details = await fetchLiveScoreDetailsCached(match.Matchid);
+        if (!details.length) return;
+
+        const points = details
+            .filter(evt => String(evt.Decision || '').toLowerCase() === 'point' && evt.StartDate)
+            .map(evt => ({ ...evt, parsedStart: new Date(evt.StartDate) }))
+            .filter(evt => !isNaN(evt.parsedStart.getTime()))
+            .sort((a, b) => a.parsedStart - b.parsedStart);
+
+        // A single point is enough to establish an approximate match start time.
+        if (points.length > 0) {
+            startTimesByMatchId.set(String(match.Matchid), points[0].parsedStart);
+        }
+
+        if (points.length < 2) return;
+
+        const matchStart = points[0].parsedStart;
+        const matchEnd = points[points.length - 1].parsedStart;
+        const matchDurationSec = (matchEnd - matchStart) / 1000;
+
+        if (Number.isFinite(matchDurationSec) && matchDurationSec >= MIN_MATCH_DURATION_SEC) {
+            matchesWithInsights.push({ duration: matchDurationSec, match });
+            durationDistributionSeconds.push(matchDurationSec);
+        }
+
+        for (let i = 1; i < points.length; i++) {
+            const diffSec = (points[i].parsedStart - points[i - 1].parsedStart) / 1000;
+            if (diffSec >= MIN_POINT_DURATION_SEC && diffSec <= MAX_POINT_DURATION_SEC) {
+                pointLengths.push(diffSec);
             }
+        }
+    });
 
-            for (let i = 1; i < allPoints.length; i++) {
-                const diffSec = (new Date(allPoints[i].StartDate) - new Date(allPoints[i - 1].StartDate)) / 1000;
-                if (diffSec >= MIN_POINT_DURATION_SEC && diffSec <= MAX_POINT_DURATION_SEC) {
-                    pointLengths.push(diffSec);
-                }
-            }
-        } catch (e) { /* Silently ignore */ }
-    }));
+    renderMatchDurationDistribution(durationDistributionSeconds);
+    if (durationStatus && timingCandidateMatches.length === 0) {
+        durationStatus.textContent = 'No live-scored matches with timing data.';
+    }
+    // Re-render the time-of-day chart with actual live-score start timestamps.
+    renderPerformanceByDayAndTime(allMatches, currentUserId, startTimesByMatchId);
 
     if (matchesWithInsights.length > 0) {
         const avgMatchLength = matchesWithInsights.reduce((a, b) => a + b.duration, 0) / matchesWithInsights.length;
@@ -673,25 +766,38 @@ async function fetchAdvancedMatchInsights(allMatches) {
         const shortestMatch = matchesWithInsights[0];
         const longestMatch = matchesWithInsights[matchesWithInsights.length - 1];
 
-        document.getElementById('average-match-length').textContent = formatDurationSec(avgMatchLength);
-        document.getElementById('longest-match-length').textContent = formatDurationSec(longestMatch.duration);
-        document.getElementById('shortest-match-length').textContent = formatDurationSec(shortestMatch.duration);
-
+        const averageEl = document.getElementById('average-match-length');
         const longestEl = document.getElementById('longest-match-length');
         const shortestEl = document.getElementById('shortest-match-length');
-        if (longestEl) longestEl.onclick = () => showGraphModal(longestMatch.match);
-        if (shortestEl) shortestEl.onclick = () => showGraphModal(shortestMatch.match);
+        if (averageEl) averageEl.textContent = formatDurationSec(avgMatchLength);
+        if (longestEl) {
+            longestEl.textContent = formatDurationSec(longestMatch.duration);
+            longestEl.onclick = () => showGraphModal(longestMatch.match);
+        }
+        if (shortestEl) {
+            shortestEl.textContent = formatDurationSec(shortestMatch.duration);
+            shortestEl.onclick = () => showGraphModal(shortestMatch.match);
+        }
     } else {
-        ['average-match-length', 'longest-match-length', 'shortest-match-length'].forEach(id => document.getElementById(id).textContent = 'N/A');
+        ['average-match-length', 'longest-match-length', 'shortest-match-length'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = 'N/A';
+        });
     }
 
     if (pointLengths.length > 0) {
         const avgPoint = pointLengths.reduce((a, b) => a + b, 0) / pointLengths.length;
-        document.getElementById('average-point-length').textContent = formatDurationSec(avgPoint);
-        document.getElementById('longest-point-length').textContent = formatDurationSec(Math.max(...pointLengths));
-        document.getElementById('shortest-point-length').textContent = formatDurationSec(Math.min(...pointLengths));
+        const averagePointEl = document.getElementById('average-point-length');
+        const longestPointEl = document.getElementById('longest-point-length');
+        const shortestPointEl = document.getElementById('shortest-point-length');
+        if (averagePointEl) averagePointEl.textContent = formatDurationSec(avgPoint);
+        if (longestPointEl) longestPointEl.textContent = formatDurationSec(Math.max(...pointLengths));
+        if (shortestPointEl) shortestPointEl.textContent = formatDurationSec(Math.min(...pointLengths));
     } else {
-        ['average-point-length', 'longest-point-length', 'shortest-point-length'].forEach(id => document.getElementById(id).textContent = 'N/A');
+        ['average-point-length', 'longest-point-length', 'shortest-point-length'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = 'N/A';
+        });
     }
 }
 
@@ -790,9 +896,7 @@ async function fetchMatchInsightsData(match) {
 
     let data;
     try {
-        const response = await fetch(`/proxy/liveScoreDetails?match_id=${match_id}`, { signal: abortController.signal });
-        if (!response.ok) throw new Error("Proxy response not ok");
-        data = await response.json();
+        data = await fetchLiveScoreDetailsCached(match_id);
     } catch (error) {
         return null;
     }
@@ -984,13 +1088,13 @@ function renderMatchInsights(match, insightsData, container) {
             ${makeStatCard(MI_ICONS.flame, "Longest Point", formatDurationSec(longestPointSec))}
             ${makeStatCard(MI_ICONS.clock, "Avg Game", formatDurationSec(averageGameSec))}
         </div>
-        <div class="max-w-xl mx-auto"><canvas id="game-scores-bar-chart"></canvas></div>
+        <div class="max-w-xl mx-auto mi-chart-wrap"><canvas id="game-scores-bar-chart"></canvas></div>
     `;
 
     new Chart(document.getElementById('game-scores-bar-chart').getContext('2d'), {
         type: 'bar',
         data: { labels: gameLabels, datasets: [{ label: homePlayerName, data: homeGameScores, backgroundColor: 'rgba(239, 68, 68, 0.8)', borderRadius: 6 }, { label: visitingPlayerName, data: visitingGameScores, backgroundColor: 'rgba(99, 102, 241, 0.8)', borderRadius: 6 }] },
-        options: { responsive: true, plugins: { title: { display: true, text: 'Game Scores' } } }
+        options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Game Scores' } } }
     });
 
     // --- Create Game Tabs ---
@@ -1034,7 +1138,7 @@ function renderMatchInsights(match, insightsData, container) {
                     ${makeStatCard(MI_ICONS.flame, "Longest Point", formatDurationSec(longestPointSecGame))}
                 </div>
             </div>
-            <div style="max-height: 350px;"><canvas id="game-chart-${gameNum}"></canvas></div>
+            <div class="mi-chart-wrap"><canvas id="game-chart-${gameNum}"></canvas></div>
         `;
 
         const x = pointsGame.map(evt => evt.Points_left + evt.Points_right);
@@ -1042,7 +1146,6 @@ function renderMatchInsights(match, insightsData, container) {
         const p2_scores = pointsGame.map(evt => evt.Points_right);
         const lineCanvas = gameContent.querySelector(`#game-chart-${gameNum}`);
         lineCanvas.style.maxWidth = "100%";
-        lineCanvas.style.maxHeight = "350px";
 
         new Chart(lineCanvas.getContext('2d'), {
             type: 'line',
@@ -1111,35 +1214,49 @@ function isUserHomePlayer(match, userFullName) {
 }
 
 /**
- * Determines whether the given user won a match.
- *
- * match.wid1 (winner id) is correct for the vast majority of matches, but on
- * some records the authoritative match.Winner field ("H"/"V") disagrees with
- * wid1 — e.g. a disputed/corrected result where Winner was updated but wid1
- * wasn't resynced. When Winner is present and we can confidently tell (by
- * name) which side the user played, Winner takes priority over wid1.
+ * Resolves whether the current user is the home or visiting player.
+ * The matches API identifies the home player with wid1 and the visitor with oid1.
+ * Name matching is retained only as a fallback for older/incomplete records.
  */
-function didUserWinMatch(match, uid, userFullName) {
-    const widSaysWin = match.wid1 === uid;
+function resolveUserIsHome(match, uid, userFullName) {
+    const numericUid = Number(uid);
+    const homeId = Number(match.wid1);
+    const visitingId = Number(match.oid1);
 
-    if (match.Winner === 'H' || match.Winner === 'V') {
-        const isHome = isUserHomePlayer(match, userFullName);
-        if (isHome !== null) {
-            return isHome ? match.Winner === 'H' : match.Winner === 'V';
-        }
-    }
-
-    return widSaysWin;
+    if (Number.isFinite(homeId) && homeId === numericUid) return true;
+    if (Number.isFinite(visitingId) && visitingId === numericUid) return false;
+    return isUserHomePlayer(match, userFullName);
 }
 
 /**
- * Determines the opponent's display name for a match, preferring a name-based
- * home/visiting resolution over the wid1 heuristic (see didUserWinMatch).
+ * Determines whether the given user won a match.
+ * Winner === "H" means the home player won and Winner === "V" means the
+ * visiting player won. WhatKind (W/L) is used only as a fallback when a side
+ * cannot be resolved or Winner is missing.
+ */
+function didUserWinMatch(match, uid, userFullName) {
+    const isHome = resolveUserIsHome(match, uid, userFullName);
+    const winner = String(match.Winner || '').trim().toUpperCase();
+
+    if ((winner === 'H' || winner === 'V') && isHome !== null) {
+        return isHome ? winner === 'H' : winner === 'V';
+    }
+
+    const whatKind = String(match.WhatKind || '').trim().toUpperCase();
+    if (whatKind === 'W') return true;
+    if (whatKind === 'L') return false;
+
+    return false;
+}
+
+/**
+ * Determines the opponent's display name for a match.
  */
 function getOpponentDisplayName(match, uid, userFullName) {
-    const isHome = isUserHomePlayer(match, userFullName);
-    if (isHome !== null) return isHome ? match.vplayer1 : match.hplayer1;
-    return match.wid1 === uid ? match.vplayer1 : match.hplayer1;
+    const isHome = resolveUserIsHome(match, uid, userFullName);
+    if (isHome === true) return match.vplayer1 || 'Opponent';
+    if (isHome === false) return match.hplayer1 || 'Opponent';
+    return 'Opponent';
 }
 
 
@@ -1213,6 +1330,10 @@ function showMatchListModal(title, matches, userId) {
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    modal.classList.remove('mi-open');
+    void modal.offsetWidth; // restart the pop-in animation
+    modal.classList.add('mi-open');
+    document.body.classList.add('no-scroll');
 }
 
 function closeMatchListModal() {
@@ -1220,6 +1341,8 @@ function closeMatchListModal() {
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+        modal.classList.remove('mi-open');
+        document.body.classList.remove('no-scroll');
     }
 }
 
@@ -1652,6 +1775,349 @@ function initializeAnalyticsPage(allMatches, currentUserId) {
  * Main function to initialize the page and fetch all necessary data.
  * @param {string} currentUserId - The ID of the user whose data to load.
  */
+
+// ---------------------------------------------------------------------------
+// New Analytics Widgets
+// ---------------------------------------------------------------------------
+
+const analyticsWidgetCharts = {};
+
+function destroyAnalyticsWidgetChart(key) {
+    if (analyticsWidgetCharts[key]) {
+        analyticsWidgetCharts[key].destroy();
+        delete analyticsWidgetCharts[key];
+    }
+}
+
+function formatAnalyticsMinutes(seconds) {
+    if (!Number.isFinite(seconds) || seconds <= 0) return 'N/A';
+    const minutes = seconds / 60;
+    return minutes >= 60
+        ? `${Math.floor(minutes / 60)}h ${Math.round(minutes % 60)}m`
+        : `${Math.round(minutes)} min`;
+}
+
+function medianNumber(values) {
+    if (!values.length) return NaN;
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function renderMatchDurationDistribution(durations) {
+    const canvas = document.getElementById('match-duration-distribution-chart');
+    const status = document.getElementById('match-duration-distribution-status');
+    const avgEl = document.getElementById('duration-distribution-average');
+    const medianEl = document.getElementById('duration-distribution-median');
+    if (!canvas) return;
+
+    if (typeof Chart === 'undefined') {
+        if (status) status.textContent = 'Chart.js failed to load.';
+        return;
+    }
+
+    destroyAnalyticsWidgetChart('durationDistribution');
+
+    if (!durations.length) {
+        if (avgEl) avgEl.textContent = 'N/A';
+        if (medianEl) medianEl.textContent = 'N/A';
+        if (status) status.textContent = 'No match duration data available.';
+        return;
+    }
+
+    const average = durations.reduce((sum, value) => sum + value, 0) / durations.length;
+    const median = medianNumber(durations);
+    if (avgEl) avgEl.textContent = formatAnalyticsMinutes(average);
+    if (medianEl) medianEl.textContent = formatAnalyticsMinutes(median);
+    if (status) status.textContent = `${durations.length} matches with duration data`;
+
+    const durationMinutes = durations.map(seconds => seconds / 60);
+    const binSize = 5;
+    const minMinutes = Math.floor(Math.min(...durationMinutes) / binSize) * binSize;
+    let maxMinutes = Math.ceil(Math.max(...durationMinutes) / binSize) * binSize;
+    if (maxMinutes <= minMinutes) maxMinutes = minMinutes + binSize;
+
+    const labels = [];
+    const counts = [];
+    for (let start = minMinutes; start < maxMinutes; start += binSize) {
+        labels.push(`${start}-${start + binSize}`);
+        counts.push(0);
+    }
+
+    durationMinutes.forEach(minutes => {
+        let index = Math.floor((minutes - minMinutes) / binSize);
+        index = Math.max(0, Math.min(index, counts.length - 1));
+        counts[index]++;
+    });
+
+    analyticsWidgetCharts.durationDistribution = new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Matches',
+                data: counts,
+                backgroundColor: 'rgba(99, 102, 241, 0.82)',
+                borderColor: 'rgb(99, 102, 241)',
+                borderWidth: 1,
+                borderRadius: 6,
+                borderSkipped: false,
+                hoverBackgroundColor: 'rgba(79, 70, 229, 0.95)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(17, 24, 39, 0.94)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    padding: 10,
+                    cornerRadius: 8,
+                    callbacks: {
+                        title: items => items.length ? `${items[0].label} minutes` : '',
+                        label: context => `${context.raw} match${context.raw === 1 ? '' : 'es'}`
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    title: { display: true, text: 'Match Duration (minutes)', color: '#4b5563', font: { weight: '600' } },
+                    ticks: { color: '#6b7280' },
+                    grid: { display: false },
+                    border: { display: false }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { precision: 0, color: '#6b7280', stepSize: 1 },
+                    title: { display: true, text: 'Number of Matches', color: '#4b5563', font: { weight: '600' } },
+                    grid: { color: 'rgba(0, 0, 0, 0.07)', drawBorder: false },
+                    border: { display: false }
+                }
+            }
+        }
+    });
+}
+
+function getMatchOutcomeForAnalytics(match, currentUserId) {
+    return didUserWinMatch(match, parseInt(currentUserId, 10), currentUserFullName);
+}
+
+function hasMeaningfulTime(matchDate) {
+    if (!matchDate) return false;
+    if (matchDate instanceof Date) {
+        return matchDate.getHours() !== 0 || matchDate.getMinutes() !== 0 || matchDate.getSeconds() !== 0;
+    }
+    const text = String(matchDate);
+    const timeMatch = text.match(/T(\d{2}):(\d{2})(?::(\d{2}))?/);
+    if (!timeMatch) return false;
+    return Number(timeMatch[1]) !== 0 || Number(timeMatch[2]) !== 0 || Number(timeMatch[3] || 0) !== 0;
+}
+
+function renderPerformanceByDayAndTime(allMatches, currentUserId, startTimesByMatchId = null) {
+    const dayCanvas = document.getElementById('performance-day-chart');
+    const timeCanvas = document.getElementById('performance-time-chart');
+    const status = document.getElementById('performance-time-status');
+    if (!dayCanvas || !timeCanvas) return;
+
+    if (typeof Chart === 'undefined') {
+        if (status) status.textContent = 'Chart.js failed to load.';
+        return;
+    }
+
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayStats = dayNames.map(name => ({ name, wins: 0, total: 0 }));
+
+    // Time-of-day definitions:
+    // Morning:   5:00 AM - 11:59 AM
+    // Afternoon: 12:00 PM - 4:59 PM
+    // Evening:   5:00 PM - 8:59 PM
+    // Night:     9:00 PM - 4:59 AM
+    const timeBuckets = [
+        { name: 'Morning', range: '5 AM–11:59 AM', chartLabel: ['Morning', '5 AM–11:59 AM'] },
+        { name: 'Afternoon', range: '12 PM–4:59 PM', chartLabel: ['Afternoon', '12 PM–4:59 PM'] },
+        { name: 'Evening', range: '5 PM–8:59 PM', chartLabel: ['Evening', '5 PM–8:59 PM'] },
+        { name: 'Night', range: '9 PM–4:59 AM', chartLabel: ['Night', '9 PM–4:59 AM'] }
+    ];
+    const timeStats = timeBuckets.map(bucket => ({ ...bucket, wins: 0, total: 0 }));
+
+    let dayMatchCount = 0;
+    let timedMatchCount = 0;
+
+    (allMatches || []).forEach(match => {
+        const didWin = getMatchOutcomeForAnalytics(match, currentUserId);
+
+        if (match.MatchDate) {
+            const date = new Date(match.MatchDate);
+            if (!isNaN(date.getTime())) {
+                const day = dayStats[date.getDay()];
+                day.total++;
+                dayMatchCount++;
+                if (didWin) day.wins++;
+            }
+        }
+
+        let startDate = null;
+        if (startTimesByMatchId && match.Matchid != null) {
+            startDate = startTimesByMatchId.get(String(match.Matchid)) || null;
+        }
+        if (!startDate && hasMeaningfulTime(match.MatchDate)) {
+            startDate = new Date(match.MatchDate);
+        }
+        if (!startDate || isNaN(new Date(startDate).getTime())) return;
+
+        const hour = new Date(startDate).getHours();
+        let bucket;
+        if (hour >= 5 && hour < 12) bucket = 0;       // Morning
+        else if (hour >= 12 && hour < 17) bucket = 1; // Afternoon
+        else if (hour >= 17 && hour < 21) bucket = 2; // Evening
+        else bucket = 3;                              // Night
+
+        timeStats[bucket].total++;
+        timedMatchCount++;
+        if (didWin) timeStats[bucket].wins++;
+    });
+
+    destroyAnalyticsWidgetChart('performanceDay');
+    destroyAnalyticsWidgetChart('performanceTime');
+
+    const dayRates = dayStats.map(s => s.total ? Math.round((s.wins / s.total) * 100) : null);
+    const timeRates = timeStats.map(s => s.total ? Math.round((s.wins / s.total) * 100) : null);
+
+    const sharedDatasetStyle = {
+        backgroundColor: 'rgba(99, 102, 241, 0.82)',
+        borderColor: 'rgb(99, 102, 241)',
+        borderWidth: 1,
+        borderRadius: 6,
+        borderSkipped: false,
+        hoverBackgroundColor: 'rgba(79, 70, 229, 0.95)'
+    };
+
+    const sharedYAxis = {
+        beginAtZero: true,
+        max: 100,
+        ticks: {
+            color: '#6b7280',
+            callback: value => `${value}%`
+        },
+        title: {
+            display: true,
+            text: 'Win Rate (%)',
+            color: '#4b5563',
+            font: { weight: '600' }
+        },
+        grid: { color: 'rgba(0, 0, 0, 0.07)', drawBorder: false },
+        border: { display: false }
+    };
+
+    analyticsWidgetCharts.performanceDay = new Chart(dayCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: dayNames.map(day => day.slice(0, 3)),
+            datasets: [{
+                label: 'Win Rate',
+                data: dayRates,
+                ...sharedDatasetStyle
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(17, 24, 39, 0.94)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    padding: 10,
+                    cornerRadius: 8,
+                    callbacks: {
+                        title: items => items.length ? dayNames[items[0].dataIndex] : '',
+                        label: context => {
+                            const s = dayStats[context.dataIndex];
+                            return s.total ? `${context.raw}% win rate • ${s.wins}W-${s.total - s.wins}L` : 'No matches';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#6b7280' },
+                    grid: { display: false },
+                    border: { display: false }
+                },
+                y: sharedYAxis
+            }
+        }
+    });
+
+    analyticsWidgetCharts.performanceTime = new Chart(timeCanvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: timeBuckets.map(bucket => bucket.chartLabel),
+            datasets: [{
+                label: 'Win Rate',
+                data: timeRates,
+                ...sharedDatasetStyle
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(17, 24, 39, 0.94)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    padding: 10,
+                    cornerRadius: 8,
+                    callbacks: {
+                        title: items => {
+                            if (!items.length) return '';
+                            const bucket = timeStats[items[0].dataIndex];
+                            return `${bucket.name} (${bucket.range})`;
+                        },
+                        label: context => {
+                            const s = timeStats[context.dataIndex];
+                            return s.total ? `${context.raw}% win rate • ${s.wins}W-${s.total - s.wins}L` : 'No start-time data';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#6b7280', maxRotation: 0, autoSkip: false },
+                    grid: { display: false },
+                    border: { display: false }
+                },
+                y: sharedYAxis
+            }
+        }
+    });
+
+    if (status) {
+        if (!dayMatchCount) {
+            status.textContent = 'No match date data available.';
+        } else if (!timedMatchCount) {
+            status.textContent = `${dayMatchCount} matches analyzed by day • loading start times for time-of-day`;
+        } else {
+            status.textContent = `${dayMatchCount} matches by day • ${timedMatchCount} matches with start-time data`;
+        }
+    }
+}
+
+function renderNewAnalyticsWidgets(allMatches, currentUserId) {
+    // Render day-of-week immediately. Time-of-day is refined after live-score
+    // timestamps are loaded by fetchAdvancedMatchInsights().
+    renderPerformanceByDayAndTime(allMatches, currentUserId);
+}
+
 async function initializePage(currentUserId) {
     // Reset abort controller for new page load
     abortController = new AbortController();
@@ -1685,6 +2151,9 @@ async function initializePage(currentUserId) {
 
     const allMatches = await fetchAllMatches(currentUserId);
 
+    // New analytics widgets must be explicitly initialized after match history loads.
+    renderNewAnalyticsWidgets(allMatches, currentUserId);
+
     renderStreaks(document.getElementById('streaks-container'), computeStreaks(allMatches, currentUserId));
     const comebackStats = computeComebackStats(allMatches, currentUserId);
     renderComebackTracker(document.getElementById('comeback-tracker-container'), comebackStats, currentUserId);
@@ -1692,7 +2161,7 @@ async function initializePage(currentUserId) {
     fetchAndDisplayMonthlyRatingChanges(currentUserId, allMatches);
     calculateAverageOpponentRating(25, allMatches);
     displayLastMatch(currentUserId, allMatches);
-    fetchAdvancedMatchInsights(allMatches);
+    fetchAdvancedMatchInsights(allMatches, currentUserId);
 
 
 

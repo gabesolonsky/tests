@@ -6,7 +6,7 @@ import os
 app = Flask(__name__)
 
 COOKIES = {
-    "USSQ-API-SESSION": "s%3A91Jljx_ZPF_B-uNFtHpYVnnO-58tVNFJ.rB2c%2BZht4NzgyLCCEnNV1wg5cmFLGsDtHdgUXDLWsIU"
+    "USSQ-API-SESSION": "s%3AQnO95HekVUkcY1Jov8xCc8VBxbJX1pUf.eiyGkaxjhrNHh4ihztrrak6oiihF0SFl9rZ7VocqKho"
 }
 
 USSQUASH_HEADERS = {
@@ -39,6 +39,50 @@ def proxy_user_rankings(user_id):
     except requests.exceptions.RequestException as e:
         logger.error(f"Request error: {e}")
         return jsonify({"error": "Error fetching API data."}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@app.route("/proxy/user/<int:user_id>/rankings-current")
+def proxy_user_rankings_current(user_id):
+    # Cookieless proxy: current ranking entries (no history), e.g.
+    # https://api.ussquash.com/resources/res/user/{user_id}/rankings
+    api_url = f"https://api.ussquash.com/resources/res/user/{user_id}/rankings"
+    logger.info(f"Fetching current user rankings from: {api_url}")
+    try:
+        response = requests.get(api_url, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error: {e}")
+        return jsonify({"error": "Error fetching API data."}), 500
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({"error": "An unexpected error occurred."}), 500
+
+
+@app.route("/proxy/rankings/<int:group_id>/current")
+def proxy_rankings_group_current(group_id):
+    # Cookieless proxy for a single page of the rankings leaderboard, e.g.
+    # https://api.ussquash.com/resources/rankings/208/current?divisions=0&pageNumber=87
+    divisions = request.args.get("divisions", "0")
+    page_number = request.args.get("pageNumber", "1")
+    api_url = f"https://api.ussquash.com/resources/rankings/{group_id}/current?divisions={divisions}&pageNumber={page_number}"
+    logger.info(f"Fetching rankings group {group_id} page {page_number} from: {api_url}")
+    try:
+        response = requests.get(api_url, timeout=10)
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP error: {e}")
+        return jsonify({"error": str(e)}), response.status_code
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error: {e}")
+        return jsonify({"error": "Error fetching rankings data."}), 500
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         return jsonify({"error": "An unexpected error occurred."}), 500

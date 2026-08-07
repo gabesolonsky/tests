@@ -601,60 +601,65 @@ async function fetchUserRatings(currentUserId) {
   }
 }
 
-// Fetches and renders match record breakdown and win rate
-async function fetchAndRenderMatchRecord(currentUserId) {
-    try {
-        const response = await fetch(`/proxy/user/${currentUserId}/record`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const recordData = await response.json();
+// Fetches and renders the Match Breakdown. This uses the /record API
+// (`/proxy/user/{id}/record`) which returns the user's match record broken
+// down by match type (S/D) and length (3, 4, 5 games), so we don't have to
+// iterate through every match the user has played.
+async function fetchAndRenderMatchRecord(currentUserId, currentUserName) {
+    const breakdown = {
+        wins3: 0, wins4: 0, wins5: 0,
+        losses3: 0, losses4: 0, losses5: 0,
+        totalWins: 0, totalLosses: 0
+    };
 
-        let totalWins = 0;
-        let totalLosses = 0;
-
-        recordData.forEach(entry => {
-            const matchesType = entry.matchesType;
-            const matchesWon = entry.matchesWon || 0;
-            const matchesLost = entry.matchesLost || 0;
-
-            totalWins += matchesWon;
-            totalLosses += matchesLost;
-            
-            const winsEl = document.getElementById(`wins-${matchesType}-game`);
-            const lossesEl = document.getElementById(`losses-${matchesType}-game`);
-
-            if (winsEl) winsEl.textContent = matchesWon; // Corrected from winsWon
-            if (lossesEl) lossesEl.textContent = matchesLost;
-        });
-
-        const overallWinsEl = document.getElementById('overall-wins');
-        if (overallWinsEl) {
-            overallWinsEl.textContent = totalWins;
-        }
-
-        const overallLossesEl = document.getElementById('overall-losses');
-        if (overallLossesEl) {
-            overallLossesEl.textContent = totalLosses;
-        }
+    const updateUI = () => {
+        setText('wins-3-game', breakdown.wins3);
+        setText('wins-4-game', breakdown.wins4);
+        setText('wins-5-game', breakdown.wins5);
+        setText('losses-3-game', breakdown.losses3);
+        setText('losses-4-game', breakdown.losses4);
+        setText('losses-5-game', breakdown.losses5);
+        setText('overall-wins', breakdown.totalWins);
+        setText('overall-losses', breakdown.totalLosses);
 
         const matchesPlayedTotalEl = document.getElementById('matches-played-total');
-        if (matchesPlayedTotalEl) {
-            matchesPlayedTotalEl.textContent = totalWins + totalLosses;
-        }
+        if (matchesPlayedTotalEl) matchesPlayedTotalEl.textContent = breakdown.totalWins + breakdown.totalLosses;
 
         const winRateDisplayEl = document.getElementById('win-rate-display');
         if (winRateDisplayEl) {
-            if (totalWins + totalLosses > 0) {
-                const winRate = (totalWins / (totalWins + totalLosses)) * 100;
-                winRateDisplayEl.textContent = `${winRate.toFixed(0)}%`;
-            } else {
-                winRateDisplayEl.textContent = "0%";
-            }
+            const played = breakdown.totalWins + breakdown.totalLosses;
+            winRateDisplayEl.textContent = played > 0 ? `${Math.round((breakdown.totalWins / played) * 100)}%` : '0%';
         }
+    };
 
+    const addEntry = (entry) => {
+        if (!entry) return;
+        const wins = Number(entry.matchesWon) || 0;
+        const losses = Number(entry.matchesLost) || 0;
+
+        breakdown.totalWins += wins;
+        breakdown.totalLosses += losses;
+
+        switch (Number(entry.matchesType)) {
+            case 3: breakdown.wins3 += wins; breakdown.losses3 += losses; break;
+            case 4: breakdown.wins4 += wins; breakdown.losses4 += losses; break;
+            case 5: breakdown.wins5 += wins; breakdown.losses5 += losses; break;
+        }
+    };
+
+    try {
+        const response = await fetch(`/proxy/user/${currentUserId}/record`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+
+        if (!Array.isArray(data)) throw new Error('Record response is not an array');
+
+        // Only count singles ('S') records for the singles breakdown.
+        data.filter(entry => entry.type === 'S').forEach(addEntry);
+
+        updateUI();
     } catch (error) {
-        console.error("Error fetching or rendering match record:", error);
+        console.error("Error fetching or rendering match breakdown:", error);
         const ids = ['wins-3-game', 'wins-4-game', 'wins-5-game', 'losses-3-game', 'losses-4-game', 'losses-5-game'];
         ids.forEach(id => {
             const el = document.getElementById(id);
@@ -671,124 +676,247 @@ async function fetchAndRenderMatchRecord(currentUserId) {
     }
 }
 
-// Fetches and renders user's personal details - MODIFIED TO RETURN USER NAME
+// Default profile picture used everywhere
+const DEFAULT_PROFILE_PICTURE = 'https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png';
+
+/**
+ * Fetches and renders user's personal details on the dashboard.
+ *
+ * Personal details are resolved from the public rankings lookup
+ * (`fetchUserFromRankings`), falling back to the `/proxy/user/{id}` details
+ * API if the rankings lookup fails.
+ *
+ * @param {string|number} currentUserId - The ID of the user.
+ * @returns {Promise<string|null>} The user's full name (for match rendering), or null on total failure.
+ */
 async function fetchAndRenderUserDetails(currentUserId) {
+    const setDefaults = () => {
+        setText('welcome-message', 'Welcome Back 🎉');
+        setText('player-name', 'N/A');
+        setText('member-status', 'Member, US Squash');
+        setImg('profile-picture', DEFAULT_PROFILE_PICTURE);
+        setText('player-email', 'N/A');
+        setText('player-home-club', 'N/A');
+        setText('player-location', 'N/A');
+        setText('player-birthday', 'N/A');
+        setText('player-gender', 'N/A');
+    };
+
+    let userData = null;
+
     try {
+        // Fetch the selected user's direct profile first. We use its first name
+        // as the identity check for the leaderboard row so a shifted ranking
+        // cannot populate Personal Details with a different player.
         const response = await fetch(`/proxy/user/${currentUserId}`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const userData = await response.json();
-        console.log("User Details Data:", userData);
-
-        const welcomeMessageEl = document.getElementById('welcome-message');
-        if (welcomeMessageEl && userData.firstName) {
-            welcomeMessageEl.textContent = `Welcome Back, ${userData.firstName} 🎉`; 
+        if (response.ok) {
+            userData = await response.json();
+        } else {
+            console.warn(`User details HTTP error ${response.status}; rankings lookup will continue without a first-name check.`);
         }
 
-        const profilePictureEl = document.getElementById('profile-picture');
-        if (profilePictureEl && userData.profilePictureUrl) {
-            profilePictureEl.src = userData.profilePictureUrl;
-        } else if (profilePictureEl) {
-            profilePictureEl.src = 'https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png'; // Default fallback
+        const expectedFirstName = getUserFirstName(userData);
+
+        // Primary source for the richer Personal Details fields: leaderboard.
+        // The lookup checks the expected rank, then 1 above/below, then 2 above/below,
+        // and only accepts a row whose first name matches the selected user.
+        const details = await fetchUserFromRankings(currentUserId, expectedFirstName);
+        if (details && (details.firstName || details.lastName)) {
+            renderUserDetails(details);
+            currentUserFullName = [details.firstName, details.lastName].filter(Boolean).join(' ').trim();
+            return currentUserFullName;
         }
 
-        const playerNameEl = document.getElementById('player-name');
-        if (playerNameEl && userData.name) {
-            playerNameEl.textContent = userData.name;
-        } else if (playerNameEl) {
-            playerNameEl.textContent = 'N/A';
+        // Fallback to the direct user details API if no verified leaderboard row was found.
+        if (!userData) {
+            throw new Error('Could not load either verified rankings details or direct user details');
         }
 
-        const memberStatusEl = document.getElementById('member-status');
-        if (memberStatusEl && typeof userData.isMember === 'boolean') {
-            memberStatusEl.textContent = userData.isMember ? 'Member, US Squash' : 'Non-Member, US Squash';
-        } else if (memberStatusEl) {
-            memberStatusEl.textContent = 'Status Unavailable';
+        const fallbackFirstName = getUserFirstName(userData);
+        setText('welcome-message', fallbackFirstName ? `Welcome Back, ${fallbackFirstName} 🎉` : 'Welcome Back 🎉');
+        setImg('profile-picture', userData.profilePictureUrl || DEFAULT_PROFILE_PICTURE);
+        setText('player-name', userData.name || [userData.firstName, userData.lastName].filter(Boolean).join(' ') || 'N/A');
+        setText('member-status', typeof userData.isMember === 'boolean' ? (userData.isMember ? 'Member, US Squash' : 'Non-Member, US Squash') : 'Status Unavailable');
+        setText('player-email', userData.Email || userData.email || 'N/A');
+        setText('player-home-club', (userData.mainAffiliation && userData.mainAffiliation.descr) || userData.homeClub || 'N/A');
+        if (userData.City) {
+            setText('player-location', userData.State ? `${userData.City}, ${userData.State}${userData.Zip ? ' ' + userData.Zip : ''}` : userData.City);
+        } else {
+            setText('player-location', userData.location || 'N/A');
         }
+        setText('player-birthday', userData.BirthDate ? formatDate(userData.BirthDate) : 'N/A');
+        setText('player-gender', userData.Gender || userData.gender || 'N/A');
 
-        const playerEmailEl = document.getElementById('player-email');
-        if (playerEmailEl && userData.Email) { 
-            playerEmailEl.textContent = userData.Email;
-        } else if (playerEmailEl) {
-            playerEmailEl.textContent = 'N/A';
-        }
-
-        const playerPhoneEl = document.getElementById('player-phone');
-        if (playerPhoneEl && userData.CellPhone) { 
-            playerPhoneEl.textContent = userData.CellPhone;
-        } else if (playerPhoneEl) {
-            playerPhoneEl.textContent = 'N/A';
-        }
-
-        const playerBirthdayEl = document.getElementById('player-birthday');
-        if (playerBirthdayEl && userData.BirthDate) { 
-            const birthDate = new Date(userData.BirthDate);
-            if (!isNaN(birthDate)) {
-                playerBirthdayEl.textContent = birthDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-            } else {
-                playerBirthdayEl.textContent = 'N/A'; 
-            }
-        } else if (playerBirthdayEl) {
-            playerBirthdayEl.textContent = 'N/A';
-        }
-
-        const playerGenderEl = document.getElementById('player-gender');
-        if (playerGenderEl && userData.Gender) { 
-            playerGenderEl.textContent = userData.Gender;
-        } else if (playerGenderEl) {
-            playerGenderEl.textContent = 'N/A';
-        }
-
-        const playerCitizenshipEl = document.getElementById('player-citizenship');
-        // This will remain the static value from HTML unless an API field is provided.
-
-        const playerCityEl = document.getElementById('player-city');
-        if (playerCityEl && userData.City && userData.State && userData.Zip) { 
-            playerCityEl.textContent = `${userData.City}, ${userData.State} ${userData.Zip}`;
-        } else if (playerCityEl && userData.City) { 
-             playerCityEl.textContent = userData.City;
-        } else if (playerCityEl) {
-            playerCityEl.textContent = 'N/A';
-        }
-
-        const playerAffiliationEl = document.getElementById('player-affiliation');
-        if (playerAffiliationEl && userData.mainAffiliation && userData.mainAffiliation.descr) {
-            playerAffiliationEl.textContent = userData.mainAffiliation.descr;
-        } else if (playerAffiliationEl) {
-            playerAffiliationEl.textContent = 'N/A';
-        }
-
-        const playerMembershipThruEl = document.getElementById('player-membership-thru');
-        if (playerMembershipThruEl && userData.PAID_THRU) {
-            const paidThruDate = new Date(userData.PAID_THRU);
-            if (!isNaN(paidThruDate)) {
-                playerMembershipThruEl.textContent = paidThruDate.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
-            } else {
-                playerMembershipThruEl.textContent = 'N/A'; 
-            }
-        } else if (playerMembershipThruEl) {
-            playerMembershipThruEl.textContent = 'N/A';
-        }
-
-        currentUserFullName = userData.name || '';
-        return userData.name; // IMPORTANT: Return the user's full name
+        currentUserFullName = userData.name || [userData.firstName, userData.lastName].filter(Boolean).join(' ').trim();
+        return currentUserFullName || null;
     } catch (error) {
         console.error("Error fetching or rendering user details:", error);
-        // Set UI elements to indicate an'error
-        document.getElementById('welcome-message').textContent = 'Welcome Back, User 🎉';
-        document.getElementById('profile-picture').src = 'https://ussq-img-live.s3.us-east-1.amazonaws.com/uploads%2Fussq-profile-icon-default.png';
-        document.getElementById('player-name').textContent = 'Error Loading';
-        document.getElementById('member-status').textContent = 'Status Unavailable';
-        document.getElementById('player-email').textContent = 'N/A';
-        document.getElementById('player-phone').textContent = 'N/A';
-        document.getElementById('player-birthday').textContent = 'N/A';
-        document.getElementById('player-gender').textContent = 'N/A';
-        document.getElementById('player-city').textContent = 'N/A';
-        document.getElementById('player-affiliation').textContent = 'N/A';
-        document.getElementById('player-membership-thru').textContent = 'N/A';
-        return null; // Return null on error
+        setDefaults();
+        return null;
     }
+}
+
+// Returns the direct profile's first name in a consistent form for leaderboard verification.
+function getUserFirstName(userData) {
+    if (!userData) return '';
+    if (userData.firstName && String(userData.firstName).trim()) {
+        return String(userData.firstName).trim();
+    }
+    if (userData.FirstName && String(userData.FirstName).trim()) {
+        return String(userData.FirstName).trim();
+    }
+    if (userData.name && String(userData.name).trim()) {
+        return normalizeName(String(userData.name)).split(' ')[0] || '';
+    }
+    return '';
+}
+
+// First-name comparison used only to verify that a leaderboard row belongs to the selected user.
+function firstNamesMatch(a, b) {
+    const normalizeFirst = value => normalizeName(value).toLowerCase();
+    return Boolean(normalizeFirst(a) && normalizeFirst(b) && normalizeFirst(a) === normalizeFirst(b));
+}
+
+/**
+ * Performs the two-step public rankings lookup and returns a normalized object
+ * with the leaderboard entry fields, or null if any step fails.
+ *
+ * The rankings API is sometimes shifted relative to the leaderboard. Start at
+ * the expected rank (reported rank + 1), then search ±1 and ±2. When the direct
+ * profile supplied a first name, only a leaderboard row with that same first
+ * name is accepted. Candidate ranks can cross a 50-row page boundary.
+ */
+async function fetchUserFromRankings(userId, expectedFirstName = '') {
+    try {
+        // Step 1: find the current Universal Squash Rating entry.
+        const rankingsRes = await fetch(`/proxy/user/${userId}/rankings-current`);
+        if (!rankingsRes.ok) throw new Error(`Rankings HTTP error ${rankingsRes.status}`);
+        const rankings = await rankingsRes.json();
+        if (!Array.isArray(rankings)) throw new Error('Rankings response not an array');
+
+        const target = rankings.find(r =>
+            r.DivisionID === 0 &&
+            r.Rating_GroupID === 208 &&
+            r.Rating_OrgID === 13895 &&
+            r.OrgType === 8 &&
+            r.DivisionName === "All"
+        );
+        if (!target || target.Ranking === undefined) throw new Error('No Universal Squash Rating entry found');
+
+        const rawRanking = Number(target.Ranking);
+        if (!Number.isFinite(rawRanking)) throw new Error(`Invalid ranking value: ${target.Ranking}`);
+
+        // Current API behavior indicates the leaderboard is normally +1, but the
+        // exact offset can drift. Search nearest candidates in this order.
+        const expectedRanking = rawRanking + 1;
+        const candidateRanks = [
+            expectedRanking,
+            expectedRanking - 1,
+            expectedRanking + 1,
+            expectedRanking - 2,
+            expectedRanking + 2
+        ].filter(rank => Number.isInteger(rank) && rank > 0);
+
+        const pageCache = new Map();
+
+        const getLeaderboardRowsForRank = async rank => {
+            const pageNumber = Math.ceil(rank / 50);
+            if (pageCache.has(pageNumber)) return pageCache.get(pageNumber);
+
+            const boardRes = await fetch(`/proxy/rankings/208/current?divisions=0&pageNumber=${pageNumber}`);
+            if (!boardRes.ok) throw new Error(`Leaderboard HTTP error ${boardRes.status} for page ${pageNumber}`);
+            const board = await boardRes.json();
+            const rows = Array.isArray(board) ? board : (board && Array.isArray(board.rankings) ? board.rankings : []);
+            pageCache.set(pageNumber, rows);
+            return rows;
+        };
+
+        let unverifiedExpectedEntry = null;
+
+        for (const candidateRank of candidateRanks) {
+            const rows = await getLeaderboardRowsForRank(candidateRank);
+            const entry = rows.find(r => String(r.ranking) === String(candidateRank));
+            if (!entry) continue;
+
+            // If no direct-profile first name was available, preserve the old
+            // behavior and use only the expected rank rather than guessing nearby.
+            if (!expectedFirstName) {
+                if (candidateRank === expectedRanking) return normalizeLeaderboardEntry(entry);
+                continue;
+            }
+
+            if (candidateRank === expectedRanking) {
+                unverifiedExpectedEntry = entry;
+            }
+
+            if (firstNamesMatch(entry.firstName, expectedFirstName)) {
+                if (candidateRank !== expectedRanking) {
+                    console.info(`Personal details ranking corrected from ${expectedRanking} to ${candidateRank} for ${expectedFirstName}.`);
+                }
+                return normalizeLeaderboardEntry(entry);
+            }
+        }
+
+        if (expectedFirstName) {
+            const foundName = unverifiedExpectedEntry && unverifiedExpectedEntry.firstName
+                ? unverifiedExpectedEntry.firstName
+                : 'unknown';
+            throw new Error(`No leaderboard row within ±2 of rank ${expectedRanking} matched first name "${expectedFirstName}" (expected row was "${foundName}")`);
+        }
+
+        throw new Error(`Entry with ranking ${expectedRanking} not found`);
+    } catch (err) {
+        console.warn('fetchUserFromRankings failed, falling back to direct user details API:', err);
+        return null;
+    }
+}
+
+function normalizeLeaderboardEntry(entry) {
+    return {
+        firstName: entry.firstName,
+        lastName: entry.lastName,
+        email: entry.email,
+        homeClub: entry.homeClub,
+        location: entry.location || (entry.city ? [entry.city, entry.state].filter(Boolean).join(', ') : ''),
+        dob: entry.dob,
+        gender: entry.gender,
+        rating: entry.rating,
+        profilePictureUrl: entry.profilePictureUrl,
+        ranking: entry.ranking
+    };
+}
+
+/**
+ * Populates the Personal Details card from a normalized leaderboard entry.
+ */
+function renderUserDetails(details) {
+    const fullName = [details.firstName, details.lastName].filter(Boolean).join(' ').trim();
+
+    setText('welcome-message', details.firstName ? `Welcome Back, ${details.firstName} 🎉` : 'Welcome Back 🎉');
+    setText('player-name', fullName || 'N/A');
+    setText('member-status', 'Member, US Squash');
+    setImg('profile-picture', details.profilePictureUrl || DEFAULT_PROFILE_PICTURE);
+    setText('player-email', details.email || 'N/A');
+    setText('player-home-club', details.homeClub || 'N/A');
+    setText('player-location', details.location || 'N/A');
+    setText('player-birthday', details.dob ? formatDate(details.dob) : 'N/A');
+    setText('player-gender', details.gender || 'N/A');
+}
+
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
+
+function setImg(id, src) {
+    const el = document.getElementById(id);
+    if (el) el.src = src;
+}
+
+function formatDate(input) {
+    const d = new Date(input);
+    if (isNaN(d)) return 'N/A';
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
 // Fetches and calculates the average opponent rating from the last 15 matches
@@ -1006,7 +1134,7 @@ async function loadPlayerProfile(newUserId) {
         await Promise.all([
             fetchUserRatings(userId),
             fetchAndRenderRatings(userId),
-            fetchAndRenderMatchRecord(userId),
+            fetchAndRenderMatchRecord(userId, userName),
             fetchAndCalculateAverageOpponentRating(userId, userName)
         ]);
         populateRatingTooltip(); // This doesn't depend on userId, but good to call for consistency
@@ -1493,7 +1621,7 @@ function renderMatchInsights(match, insightsData, metricsContainer) {
             ${makeStatCard(MI_ICONS.flame, "Longest Point", formatDurationSec(longestPointSec))}
             ${makeStatCard(MI_ICONS.clock, "Avg Game", formatDurationSec(averageGameSec))}
         </div>
-        <div class="max-w-xl mx-auto mb-4"><canvas id="game-scores-bar-chart"></canvas></div>
+        <div class="max-w-xl mx-auto mb-4 mi-chart-wrap"><canvas id="game-scores-bar-chart"></canvas></div>
     `;
 
     new Chart(overviewContent.querySelector('#game-scores-bar-chart').getContext('2d'), {
@@ -1507,6 +1635,7 @@ function renderMatchInsights(match, insightsData, metricsContainer) {
         },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
           plugins: {
             legend: { display: true, position: 'top', labels: { color: '#333' } },
             title: { display: true, text: 'Game Scores', color: '#333', font: { size: 16 } }
@@ -1577,7 +1706,7 @@ function renderMatchInsights(match, insightsData, metricsContainer) {
                         ${makeStatCard(MI_ICONS.flame, "Longest Point", formatDurationSec(longestPointSecGame))}
                     </div>
                 </div>
-                <div style="max-height: 350px;"><canvas id="game-chart-${gameNum}"></canvas></div>
+                <div class="mi-chart-wrap"><canvas id="game-chart-${gameNum}"></canvas></div>
             `;
 
             const x = pointsGame.map(evt => evt.Points_left + evt.Points_right);
@@ -1585,7 +1714,6 @@ function renderMatchInsights(match, insightsData, metricsContainer) {
             const p2_scores = pointsGame.map(evt => evt.Points_right);
             const lineCanvas = gameContent.querySelector(`#game-chart-${gameNum}`);
             lineCanvas.style.maxWidth = "100%";
-            lineCanvas.style.maxHeight = "350px";
 
             new Chart(lineCanvas.getContext('2d'), {
                 type: 'line',

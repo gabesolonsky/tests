@@ -39,7 +39,7 @@
       position: absolute;
       inset: -3px;
       border-radius: 19px;
-      background: linear-gradient(270deg, #3b82f6, #6366f1, #ec4899, #3b82f6);
+      background: linear-gradient(270deg, #3b82f6, #a37ceb, #de9ef1, #3b82f6);
       background-size: 300% 300%;
       animation: moveGradient 4s ease infinite;
       z-index: -1;
@@ -50,6 +50,15 @@
       0% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
       100% { background-position: 0% 50%; }
+    }
+
+
+    .analytics-metric-card {
+      background: linear-gradient(145deg, #ffffff 0%, #f8fafc 100%);
+      border: 1px solid #e5e7eb;
+      border-radius: 0.875rem;
+      padding: 0.8rem 0.95rem;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.035);
     }
 
   </style>
@@ -102,7 +111,7 @@
         <div>
           <p class="text-gray-500 uppercase sidebar-text">College Squash Association</p>
           <ul class="mt-2 space-y-1">
-            <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams</span></a></li>
+            <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams <span class="ml-2 inline-flex items-center gap-1 text-xs text-yellow-800 bg-yellow-100 px-1.5 py-0.5 rounded-full"><i data-lucide="construction" class="w-3 h-3"></i>Work in Progress</span></span></a></li>
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
             <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
           </ul>
@@ -347,6 +356,7 @@
           </div>
         </div>  
 
+
         <!-- Streaks Card -->
         <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
           <h2 class="text-xl font-semibold mb-4 text-gray-800">Streaks</h2>
@@ -362,6 +372,54 @@
             <p class="text-center text-gray-500 mt-10">Loading data...</p>
           </div>
         </div>
+
+        <!-- Match Duration Distribution — directly to the right of Comeback Tracker -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-1">
+          <div class="mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">Match Duration Distribution</h2>
+            <p class="text-sm text-gray-500 mt-1">How often your matches fall into each duration range.</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="analytics-metric-card">
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Average</p>
+              <p id="duration-distribution-average" class="text-xl font-bold text-gray-800 mt-1">N/A</p>
+            </div>
+            <div class="analytics-metric-card">
+              <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Median</p>
+              <p id="duration-distribution-median" class="text-xl font-bold text-gray-800 mt-1">N/A</p>
+            </div>
+          </div>
+
+          <div class="mi-chart-wrap relative h-[250px]">
+            <canvas id="match-duration-distribution-chart"></canvas>
+          </div>
+          <p id="match-duration-distribution-status" class="text-xs text-gray-400 text-center mt-2">Loading...</p>
+        </div>
+
+        <!-- Performance by Day / Time — full-width bottom row -->
+        <div class="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl p-6 shadow-xl font-sans lg:col-span-3">
+          <div class="mb-4">
+            <h2 class="text-xl font-semibold text-gray-800">Performance by Day of Week &amp; Time of Day</h2>
+            <p class="text-sm text-gray-500 mt-1">Your win rate based on when each match started.</p>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <div class="mi-chart-wrap relative h-[285px]">
+                <canvas id="performance-day-chart"></canvas>
+              </div>
+            </div>
+
+            <div>
+              <div class="mi-chart-wrap relative h-[285px]">
+                <canvas id="performance-time-chart"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <p id="performance-time-status" class="text-xs text-gray-400 text-center mt-3">Loading...</p>
+        </div>
       </div>
     </main>
 
@@ -370,12 +428,12 @@
       <button class="mobile-nav-btn" data-target="/dashboard" aria-label="Dashboard"><i data-lucide="home"></i><span>Dashboard</span></button>
       <button class="mobile-nav-btn" data-target="/analytics" aria-label="Analytics"><i data-lucide="bar-chart-2"></i><span>Analytics</span></button>
       <button class="mobile-nav-btn" data-target="/playertracker" aria-label="Tracker"><i data-lucide="user"></i><span>Tracker</span></button>
-      <button class="mobile-nav-btn" data-target="/collegeteams" aria-label="Teams"><i data-lucide="users"></i><span>Teams</span></button>
+      <button class="mobile-nav-btn" data-target="/collegeteams" aria-label="Teams"><i data-lucide="users"></i><span class="inline-flex items-center gap-1">Teams <i data-lucide="construction" class="w-3 h-3 text-yellow-600"></i></span></button>
     </div>
   </div>
 
   <!-- Match Insights Modal -->
-  <div id="graph-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[80] hidden">
+  <div id="graph-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90] hidden">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto relative">
       <div class="mi-header flex justify-between items-center px-5 py-4 sm:px-6 rounded-t-2xl sticky top-0 z-10">
         <div class="flex items-center gap-2.5 text-white">
@@ -394,22 +452,24 @@
   </div>
 
   <!-- Generic Match List Modal (used for monthly matches + comeback wins) -->
-  <div id="match-list-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+  <div id="match-list-modal" class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm hidden items-center justify-center z-[80] p-4">
     <!-- Added max-h-[calc(100vh-2rem)] and overflow-hidden to keep the modal inside the viewport -->
-    <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[60vh] flex flex-col overflow-hidden">
-        
-        <!-- Header stays fixed at the top -->
-        <div class="flex justify-between items-center p-4 border-b shrink-0">
-            <h2 id="match-list-title" class="text-xl font-bold">Matches</h2>
-            <button id="match-list-close" class="p-2 text-neutral-400 hover:text-gray-800 transition-colors rounded-lg focus:outline-none" aria-label="Close">
-              <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path>
-              </svg>
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[60vh] flex flex-col overflow-hidden relative">
+        <!-- Header stays fixed at the top (gradient, matches Match Insights modal) -->
+        <div class="mi-header flex justify-between items-center px-5 py-4 sm:px-6 rounded-t-2xl shrink-0">
+            <div class="flex items-center gap-2.5 text-white">
+                <span id="match-list-icon" class="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center [&>svg]:w-4.5 [&>svg]:h-4.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                </span>
+                <h2 id="match-list-title" class="text-lg font-semibold">Matches</h2>
+            </div>
+            <button id="match-list-close" class="mi-close-btn" aria-label="Close">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
             </button>
         </div>
 
         <!-- Body scrolls independently within the remaining modal height -->
-        <div id="match-list-body" class="overflow-y-auto p-4 flex-1">
+        <div id="match-list-body" class="overflow-y-auto p-5 sm:p-6 flex-1">
             <!-- Match cards injected here -->
         </div>
 

@@ -116,7 +116,7 @@
             <p class="text-gray-500 uppercase sidebar-text">College Squash Association</p>
             <ul class="mt-2 space-y-1">
 
-                  <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-100 text-purple-600"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams</span></a></li>
+                  <li><a href="/collegeteams" class="flex items-center gap-3 px-3 py-2 rounded-md bg-gray-100 text-purple-600"><i data-lucide="receipt-text" class="w-5 h-5"></i><span class="sidebar-text">Teams <span class="ml-2 inline-flex items-center gap-1 text-xs text-yellow-800 bg-yellow-100 px-1.5 py-0.5 rounded-full"><i data-lucide="construction" class="w-3 h-3"></i>Work in Progress</span></span></a></li>
                   <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="calendar-1" class="w-5 h-5"></i><span class="sidebar-text">Schedule <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
                   <li><a href="#" class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-gray-100 text-gray-700"><i data-lucide="trending-up" class="w-5 h-5"></i><span class="sidebar-text">Standings <span class="ml-2 inline-block text-xs text-gray-400 bg-gray-100 px-1 py-0.5 rounded-full">Coming soon</span></span></a></li>
             </ul>
@@ -232,13 +232,52 @@
             </section>
 
     </main>
+    <!--// ====== PREDICTOR TAB ====== 
+    <div id="tab-predictor" class="tab-content hidden">
+      <div class="glass-card rounded-2xl p-6 max-w-4xl mx-auto">
+        <h2 class="text-xl font-semibold text-gray-800 mb-1">Team vs. Team Predictor</h2>
+        <p class="text-sm text-gray-500 mb-6">Select two teams to see a predicted score based on top 9 players' ratings.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Team A</label>
+            <select id="team-a-select" class="team-select">
+              <option value="">Choose team...</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Team B</label>
+            <select id="team-b-select" class="team-select">
+              <option value="">Choose team...</option>
+            </select>
+          </div>
+        </div>
+
+        <button id="predict-btn" class="w-full md:w-auto px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+          <i data-lucide="zap" class="w-5 h-5"></i> Predict
+        </button>
+
+        // Result area 
+        <div id="prediction-result" class="mt-6 hidden">
+          <div class="bg-indigo-50 rounded-xl p-4 mb-4 flex items-center justify-between flex-wrap gap-2">
+            <span class="font-bold text-lg text-indigo-900">Predicted Score</span>
+            <span id="prediction-score" class="score-badge text-lg px-4 py-1">0 – 0</span>
+          </div>
+          <div id="prediction-details" class="space-y-1 text-sm">
+            // Individual matchups will be injected here 
+          </div>
+        </div>
+        <div id="prediction-error" class="mt-4 text-red-500 text-sm hidden"></div>
+      </div>
+    </div>
+  -->
 
     <!-- Mobile bottom navigation -->
     <div id="mobile-nav" class="mobile-bottom-nav md:hidden" role="navigation" aria-label="Mobile navigation">
       <button class="mobile-nav-btn" data-target="/dashboard" aria-label="Dashboard"><i data-lucide="home"></i><span>Dashboard</span></button>
       <button class="mobile-nav-btn" data-target="/analytics" aria-label="Analytics"><i data-lucide="bar-chart-2"></i><span>Analytics</span></button>
       <button class="mobile-nav-btn" data-target="/playertracker" aria-label="Tracker"><i data-lucide="user"></i><span>Tracker</span></button>
-      <button class="mobile-nav-btn" data-target="/collegeteams" aria-label="Teams"><i data-lucide="users"></i><span>Teams</span></button>
+      <button class="mobile-nav-btn" data-target="/collegeteams" aria-label="Teams"><i data-lucide="users"></i><span class="inline-flex items-center gap-1">Teams <i data-lucide="construction" class="w-3 h-3 text-yellow-600"></i></span></button>
     </div>
   </div>
 
